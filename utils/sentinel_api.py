@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import os
+from osgeo import gdal, osr
 import requests
 import sys
 import time
@@ -44,9 +45,6 @@ class SentinelApi:
         )
         response.raise_for_status()
         data = response.json()
-
-        # with open("output.json", "w") as file:
-        #    file.write(json.dumps(data, indent=2))
 
         if not data["features"]:
             print(
@@ -109,3 +107,25 @@ class SentinelApi:
         if not os.environ.get("COPERNICUS_TOKEN_EXPIRES"):
             return True
         return int(os.environ["COPERNICUS_TOKEN_EXPIRES"]) < time.time()
+
+    @staticmethod
+    def location_to_pixel(image: str, latitude: float, longitude: float):
+        gdal.UseExceptions()
+        dataset = gdal.Open(image)
+        if not dataset:
+            raise Exception("Could not load image file!")
+
+        transform = dataset.GetGeoTransform()
+        projection = dataset.GetProjection()
+
+        source = osr.SpatialReference()
+        source.ImportFromWkt(projection)
+        target = osr.SpatialReference()
+        target.ImportFromEPSG(4326)  # code for WGS84 (latitude and longitude)
+
+        coordinate_transform = osr.CoordinateTransformation(target, source)
+        x, y, _ = coordinate_transform.TransformPoint(latitude, longitude)
+        pixel_x = int((x - transform[0]) / transform[1])
+        pixel_y = int((y - transform[3]) / transform[5])
+
+        return pixel_x, pixel_y
