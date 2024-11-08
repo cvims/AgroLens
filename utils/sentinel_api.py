@@ -45,9 +45,6 @@ class SentinelApi:
         response.raise_for_status()
         data = response.json()
 
-        # with open("output.json", "w") as file:
-        #    file.write(json.dumps(data, indent=2))
-
         if not data["features"]:
             print(
                 f"No data available for the chosen date and location!", file=sys.stderr
