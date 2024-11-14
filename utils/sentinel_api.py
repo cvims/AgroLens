@@ -1,8 +1,12 @@
 from datetime import datetime, timedelta
 import os
+from pathlib import Path
+import re
 import requests
+import shutil
 import sys
 import time
+from zipfile import ZipFile
 
 
 class SentinelApi:
@@ -18,7 +22,7 @@ class SentinelApi:
         latitude: float,
         longitude: float,
         span: int = 30,
-        cloudCover: int = 30,
+        cloudCover: int = 50,
         limit: int = 1,
     ):
         __class__.authenticate()
@@ -54,7 +58,9 @@ class SentinelApi:
         return data["features"]
 
     @staticmethod
-    def download_data(id: str, target_path: str):
+    def download_data(id: str, name: str, target_path: str = ""):
+        zipfile = Path(target_path) / f"{id}.zip"
+
         with requests.get(
             __class__.DOWNLOAD_URL.replace("#product_id#", id),
             allow_redirects=True,
@@ -62,7 +68,7 @@ class SentinelApi:
             headers={"Authorization": f"Bearer {os.environ["COPERNICUS_TOKEN"]}"},
         ) as response:
             response.raise_for_status()
-            with open(target_path, "wb") as file:
+            with open(zipfile, "wb") as file:
                 total = int(response.headers.get("content-length"))
                 downloaded = 0
                 print(f"Downloading {round(total / 1048576)} MB to '{target_path}'...")
@@ -73,6 +79,8 @@ class SentinelApi:
                         file.write(chunk)
                         downloaded += len(chunk)
                 print("Download complete")
+
+        __class__._extract(zipfile, Path(target_path) / name)
 
     @staticmethod
     def authenticate():
@@ -106,3 +114,28 @@ class SentinelApi:
         if not os.environ.get("COPERNICUS_TOKEN_EXPIRES"):
             return True
         return int(os.environ["COPERNICUS_TOKEN_EXPIRES"]) < time.time()
+
+    @staticmethod
+    def _extract(source_path: Path, target_path: Path):
+        print("Extracting...")
+        shutil.rmtree(target_path, True)
+
+        with ZipFile(source_path, "r") as zip:
+            zip.extractall(target_path)
+            os.remove(source_path)
+
+        root = target_path / os.listdir(target_path)[0]
+        path = root / "GRANULE"
+        path = path / os.listdir(path)[0] / "IMG_DATA"
+        os.rename(path / "R10m", target_path / "R10m")
+        os.rename(path / "R20m", target_path / "R20m")
+        os.rename(path / "R60m", target_path / "R60m")
+        shutil.rmtree(root)
+
+        for dir in os.listdir(target_path):
+            for file in os.listdir(target_path / dir):
+                band = file.split("_")[2]
+                os.rename(
+                    target_path / dir / file,
+                    target_path / dir / f"{band}.jp2".lower(),
+                )
