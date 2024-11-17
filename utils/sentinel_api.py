@@ -125,11 +125,19 @@ class SentinelApi:
             os.remove(source_path)
 
         root = target_path / os.listdir(target_path)[0]
-        path = root / "GRANULE"
-        path = path / os.listdir(path)[0] / "IMG_DATA"
-        os.rename(path / "R10m", target_path / "R10m")
-        os.rename(path / "R20m", target_path / "R20m")
-        os.rename(path / "R60m", target_path / "R60m")
+        granule_path  = root / "GRANULE"
+        img_data_path  = granule_path  / os.listdir(granule_path )[0] / "IMG_DATA"
+        qi_data_path = granule_path  / os.listdir(granule_path )[0] / "QI_DATA"
+        
+        os.rename(img_data_path  / "R10m", target_path / "R10m")
+        os.rename(img_data_path  / "R20m", target_path / "R20m")
+        os.rename(img_data_path  / "R60m", target_path / "R60m")
+        
+        cloud_file = qi_data_path / "MSK_CLDPRB_20m.jp2"
+        print(cloud_file)
+        if cloud_file.exists():
+            shutil.move(str(cloud_file), str(target_path / "MSK_CLDPRB_20m.jp2"))
+            
         shutil.rmtree(root)
 
         for dir in os.listdir(target_path):
