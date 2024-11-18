@@ -12,28 +12,47 @@ from utils.image_utils import ImageUtils
 
 
 class SentinelApi:
+    """
+    Methods to query and download Sentinel 2 data
+    """
+
     AUTH_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
     API_URL = "https://catalogue.dataspace.copernicus.eu/resto/api/collections/Sentinel2/search.json"
     DOWNLOAD_URL = (
         "https://zipper.dataspace.copernicus.eu/odata/v1/Products(#product_id#)/$value"
     )
 
-    @staticmethod
+    @classmethod
     def get_data(
+        cls,
         date: str,
         latitude: float,
         longitude: float,
         span: int = 30,
         cloudCover: int = 50,
         limit: int = 1,
-    ) -> dict:
-        __class__.authenticate()
+    ) -> list[dict]:
+        """
+        Searches for Sentinel 2 datasets
+
+        Parameters:
+            date (str): Date in YYYY-MM-DD format
+            latitude (float): GPS latitude
+            longitude (float): GPS longitude
+            span (int, optional): Maximum span of days to search, defaults to 30.
+            cloudCover (int, optional): Maximum percent of cloud coverage in the tile, defaults to 50.
+            limit (int, optional): Maximum number of returned entries, defaults to 1.
+
+        Returns:
+            list[dict]: list of Sentinel 2 datasets, ordered by newest date
+        """
+        cls.authenticate()
 
         end = datetime.fromisoformat(date) + timedelta(days=1)
         start = end - timedelta(days=span)
 
         query = (
-            f"{__class__.API_URL}"
+            f"{cls.API_URL}"
             f"?startDate={start.isoformat()}Z"
             f"&completionDate={end.isoformat()}Z"
             f"&maxRecords={limit}"
@@ -59,8 +78,16 @@ class SentinelApi:
 
         return data["features"]
 
-    @staticmethod
-    def download_data(id: str, dataset_name: str, target_path: str = None) -> None:
+    @classmethod
+    def download_data(cls, id: str, dataset_name: str, target_path: str = None) -> None:
+        """
+        Downloads and extracts a full Sentinel dataset
+
+        Parameters:
+            id (str): ID of the dataset (from Sentinel API)
+            dataset_name (str): Name under which the data should be saved
+            target_path (str, optional): Target path to extract to, defaults to $SENTINEL_DIR.
+        """
         if target_path is None:
             target_path = os.environ.get("SENTINEL_DIR", "")
 
@@ -71,10 +98,11 @@ class SentinelApi:
         os.makedirs(target_path, exist_ok=True)
         zipfile = Path(target_path) / f"{id}.zip"
 
-        __class__.authenticate()
+        cls.authenticate()
 
+        # download zipfile from server and display progress
         with requests.get(
-            __class__.DOWNLOAD_URL.replace("#product_id#", id),
+            cls.DOWNLOAD_URL.replace("#product_id#", id),
             allow_redirects=True,
             stream=True,
             headers={"Authorization": f"Bearer {os.environ["COPERNICUS_TOKEN"]}"},
@@ -92,29 +120,43 @@ class SentinelApi:
                         downloaded += len(chunk)
                 print("Download complete")
 
-        __class__._extract(zipfile, Path(target_path) / dataset_name)
+        cls._extract(zipfile, Path(target_path) / dataset_name)
 
     @staticmethod
     def crop_images(
-        dataset_name: str, latitude: float, longitude: float, target_path: str = None
+        dataset_name: str, latitude: float, longitude: float, parent_path: str = None
     ) -> None:
-        if target_path is None:
-            target_path = os.environ.get("SENTINEL_DIR", "")
+        """
+        Crops all satellite images in the dataset to 100px around the given location to save disk space
 
-        path = Path(target_path) / dataset_name / "IMG_DATA"
+        Parameters:
+            dataset_name (str): Name of the dataset folder
+            latitude (float): GPS latitude
+            longitude (float): GPS longitude
+            target_path (str, optional): Parent path of the dataset folder, defaults to $SENTINEL_DIR.
+        """
+        if parent_path is None:
+            parent_path = os.environ.get("SENTINEL_DIR", "")
+
+        path = Path(parent_path) / dataset_name / "IMG_DATA"
 
         for file in glob.glob("**/*.jp2", root_dir=path, recursive=True):
             file_path = str(path / file)
             print(f"Cropping image '{file_path}'...")
             ImageUtils.crop_location(file_path, file_path, latitude, longitude, 50)
 
-    @staticmethod
-    def authenticate() -> None:
-        if __class__._is_authenticated():
+    @classmethod
+    def authenticate(cls) -> None:
+        """
+        Authenticates with the Sentinel API using $COPERNICUS_USER and $COPERNICUS_PASSWORD
+        and saves the authentication token to $COPERNICUS_TOKEN.
+        Authentication is skipped if there is already a valid token.
+        """
+        if cls._is_authenticated():
             return
 
         response = requests.post(
-            __class__.AUTH_URL,
+            cls.AUTH_URL,
             allow_redirects=True,
             data={
                 "username": os.environ["COPERNICUS_USER"],
@@ -134,7 +176,13 @@ class SentinelApi:
         print("Copernicus Dataspace authentication successful")
 
     @staticmethod
-    def _is_authenticated() -> None:
+    def _is_authenticated() -> bool:
+        """
+        Checks if the authentication token stored in $COPERNICUS_TOKEN is present and not expired.
+
+        Returns:
+            bool: Returns True if the script is already authenticated
+        """
         if not os.environ.get("COPERNICUS_TOKEN"):
             return False
         if not os.environ.get("COPERNICUS_TOKEN_EXPIRES"):
@@ -143,6 +191,31 @@ class SentinelApi:
 
     @staticmethod
     def _extract(source_path: Path, target_path: Path) -> None:
+        """
+        Extracts the contents of the sentinel dataset zipfile, deletes unneccesary files
+        and renames the image files for easier access.
+        The following directory structure is achieved:
+        ├── AUX_DATA
+        │   └── <...>
+        ├── IMG_DATA
+        │   ├── R10m
+        │   │   ├── AOT.jp2
+        │   │   ├── B02.jp2
+        │   │   ├── B03.jp2
+        │   │   └── <...>.jp2
+        │   ├── R20m
+        │   │   └── <...>.jp2
+        │   └── R60m
+        │       └── <...>.jp2
+        ├── QI_DATA
+        │   └── <...>
+        ├── MTD_MSIL2A.xml
+        └── MTD_TL.xml
+
+        Parameters:
+            source_path (Path): Path of the downloaded sentinel zipfile
+            target_path (Path): Target folder to extract to
+        """
         print("Extracting...")
         shutil.rmtree(target_path, True)
 
