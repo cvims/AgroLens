@@ -38,6 +38,13 @@ class ImageUtils:
         cv2.imwrite(target, cropped)
 
     @staticmethod
+    def crop_location(
+        source: str, target: str, latitude: float, longitude: float, radius: int
+    ):
+        x, y = __class__.location_to_pixel(source, latitude, longitude)
+        __class__.crop_center(source, target, x, y, radius)
+
+    @staticmethod
     def merge_channels(image_blue: str, image_green: str, image_red: str, target: str):
         blue = cv2.imread(image_blue, 0)
         green = cv2.imread(image_green, 0)

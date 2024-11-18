@@ -1,12 +1,14 @@
 from datetime import datetime, timedelta
+import glob
 import os
 from pathlib import Path
-import re
 import requests
 import shutil
 import sys
 import time
 from zipfile import ZipFile
+
+from utils.image_utils import ImageUtils
 
 
 class SentinelApi:
@@ -24,7 +26,7 @@ class SentinelApi:
         span: int = 30,
         cloudCover: int = 50,
         limit: int = 1,
-    ):
+    ) -> dict:
         __class__.authenticate()
 
         end = datetime.fromisoformat(date) + timedelta(days=1)
@@ -58,8 +60,18 @@ class SentinelApi:
         return data["features"]
 
     @staticmethod
-    def download_data(id: str, name: str, target_path: str = ""):
+    def download_data(id: str, dataset_name: str, target_path: str = None) -> None:
+        if target_path is None:
+            target_path = os.environ.get("SENTINEL_DIR", "")
+
+        if (Path(target_path) / dataset_name).exists():
+            print(f"The sentinel dataset '{dataset_name}' has already been downloaded.")
+            return
+
+        os.makedirs(target_path, exist_ok=True)
         zipfile = Path(target_path) / f"{id}.zip"
+
+        __class__.authenticate()
 
         with requests.get(
             __class__.DOWNLOAD_URL.replace("#product_id#", id),
@@ -71,7 +83,7 @@ class SentinelApi:
             with open(zipfile, "wb") as file:
                 total = int(response.headers.get("content-length"))
                 downloaded = 0
-                print(f"Downloading {round(total / 1048576)} MB to '{target_path}'...")
+                print(f"Downloading {round(total / 1048576)} MB to '{zipfile}'...")
                 for chunk in response.iter_content(chunk_size=16777216):  # 16 MB chunks
                     if chunk:
                         progress = round(downloaded * 100 / total)
@@ -80,10 +92,24 @@ class SentinelApi:
                         downloaded += len(chunk)
                 print("Download complete")
 
-        __class__._extract(zipfile, Path(target_path) / name)
+        __class__._extract(zipfile, Path(target_path) / dataset_name)
 
     @staticmethod
-    def authenticate():
+    def crop_images(
+        dataset_name: str, latitude: float, longitude: float, target_path: str = None
+    ) -> None:
+        if target_path is None:
+            target_path = os.environ.get("SENTINEL_DIR", "")
+
+        path = Path(target_path) / dataset_name / "IMG_DATA"
+
+        for file in glob.glob("**/*.jp2", root_dir=path, recursive=True):
+            file_path = str(path / file)
+            print(f"Cropping image '{file_path}'...")
+            ImageUtils.crop_location(file_path, file_path, latitude, longitude, 50)
+
+    @staticmethod
+    def authenticate() -> None:
         if __class__._is_authenticated():
             return
 
@@ -108,7 +134,7 @@ class SentinelApi:
         print("Copernicus Dataspace authentication successful")
 
     @staticmethod
-    def _is_authenticated():
+    def _is_authenticated() -> None:
         if not os.environ.get("COPERNICUS_TOKEN"):
             return False
         if not os.environ.get("COPERNICUS_TOKEN_EXPIRES"):
@@ -116,26 +142,35 @@ class SentinelApi:
         return int(os.environ["COPERNICUS_TOKEN_EXPIRES"]) < time.time()
 
     @staticmethod
-    def _extract(source_path: Path, target_path: Path):
+    def _extract(source_path: Path, target_path: Path) -> None:
         print("Extracting...")
         shutil.rmtree(target_path, True)
 
         with ZipFile(source_path, "r") as zip:
-            zip.extractall(target_path)
+            zip.extractall(target_path.parent / source_path.stem)
             os.remove(source_path)
 
-        root = target_path / os.listdir(target_path)[0]
+        # move required files to target directory
+        root = target_path.parent / source_path.stem
+        root = root / os.listdir(root)[0]
         path = root / "GRANULE"
-        path = path / os.listdir(path)[0] / "IMG_DATA"
-        os.rename(path / "R10m", target_path / "R10m")
-        os.rename(path / "R20m", target_path / "R20m")
-        os.rename(path / "R60m", target_path / "R60m")
-        shutil.rmtree(root)
+        path = path / os.listdir(path)[0]
+        os.rename(path, target_path)
+        os.rename(root / "MTD_MSIL2A.xml", target_path / "MTD_MSIL2A.xml")
 
-        for dir in os.listdir(target_path):
-            for file in os.listdir(target_path / dir):
+        # rename image files to "<band>.jp2"
+        img_path = target_path / "IMG_DATA"
+        for dir in os.listdir(img_path):
+            for file in os.listdir(img_path / dir):
                 band = file.split("_")[2]
                 os.rename(
-                    target_path / dir / file,
-                    target_path / dir / f"{band}.jp2".lower(),
+                    img_path / dir / file,
+                    img_path / dir / f"{band}.jp2",
                 )
+        for file in glob.glob("*_PVI.jp2", root_dir=target_path / "QI_DATA"):
+            os.rename(
+                target_path / "QI_DATA" / file,
+                target_path / "QI_DATA" / "PVI.jp2",
+            )
+
+        shutil.rmtree(root.parent)
