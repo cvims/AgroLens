@@ -2,13 +2,16 @@ from datetime import datetime, timedelta
 import glob
 import os
 from pathlib import Path
+import re
 import requests
 import shutil
 import sys
 import time
 from zipfile import ZipFile
-
 from utils.image_utils import ImageUtils
+import rasterio
+import numpy as np
+
 
 
 class SentinelApi:
@@ -121,6 +124,7 @@ class SentinelApi:
                 print("Download complete")
 
         cls._extract(zipfile, Path(target_path) / dataset_name)
+
 
     @staticmethod
     def crop_images(
@@ -247,3 +251,29 @@ class SentinelApi:
             )
 
         shutil.rmtree(root.parent)
+
+    @staticmethod
+    def _check_cloud_pixel(input_file, threshold=20):
+        """
+            Checks whether the middle pixel and the 5 neighboring pixels are covered by clouds.
+            
+            Parameters:
+                input_file (str): Path to the input file (GeoTIFF with bands).
+                threshold (int): Threshold value for cloud probability.
+            
+            Returns:
+                bool: True if clouds cover the middle pixel or neighboring pixels, otherwise False.
+        """
+        with rasterio.open(input_file) as src:
+            # Determine image size and center
+            height, width = src.height, src.width
+            center_row, center_col = height // 2, width // 2
+            
+            cloud_band = src.read(1)  # Band 1 for MSK_CLDPRB
+            # Select middle pixel and neighboring pixel
+            region = cloud_band[center_row-2:center_row+2, center_col-2:center_col+2]
+            # Check whether a pixel is above the threshold value
+            cloud_present = np.any(region >= threshold)
+
+        return cloud_present
+
