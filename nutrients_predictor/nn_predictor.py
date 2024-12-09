@@ -115,6 +115,16 @@ class TrainingPipeline:
             return optim.Adam(self.model.parameters(), lr=self.learning_rate)
         else:
             raise ValueError(f"Unsupported optimizer type: {self.optimizer_type}")
+        
+    def save_model(self, file_path):
+        """
+        Saves the trained model to the specified file path.
+
+        Args:
+            file_path (str): The path where the model will be saved.
+        """
+        torch.save(self.model.state_dict(), file_path)
+        print(f"Model saved to {file_path}")
 
     def train(self):
         """
