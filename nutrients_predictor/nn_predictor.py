@@ -116,6 +116,16 @@ class TrainingPipeline:
         else:
             raise ValueError(f"Unsupported optimizer type: {self.optimizer_type}")
 
+    def save_model(self, file_path):
+        """
+        Saves the trained model to the specified file path.
+
+        Args:
+            file_path (str): The path where the model will be saved.
+        """
+        torch.save(self.model.state_dict(), file_path)
+        print(f"Model saved to {file_path}")
+
     def train(self):
         """
         Trains the model using the training dataset for the specified number of epochs.
