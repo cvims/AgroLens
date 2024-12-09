@@ -1,60 +1,151 @@
-
-import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 
-learning_rate = 0.001
- 
-# ----------------------------------------------------------------------- 
- 
-# load the dataset, split into input (X) and output (y) variables
-dataset = np.loadtxt('Example.csv', delimiter=',')
-X = dataset[:,0:12]
-y = dataset[:,12] # needs to be adapted on the relevant value
- 
-X = torch.tensor(X, dtype=torch.float32)
-y = torch.tensor(y, dtype=torch.float32).reshape(-1, 1)
- 
-# ----------------------------------------------------------------------- 
- 
-# define the model
-model = nn.Sequential(
-    nn.Linear(13, 16),
-    nn.ReLU(),
-    nn.Linear(16, 8),
-    nn.ReLU(),
-    nn.Linear(8, 1),
-    nn.ReLU()
-)
-print(model)
- 
-# train the model
-loss_fn   = nn.MSELoss()  # mean squared error
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
- 
-n_epochs = 100
-batch_size = 10
- 
-for epoch in range(n_epochs):
-    for i in range(0, len(X), batch_size):
-        Xbatch = X[i:i+batch_size]
-        y_pred = model(Xbatch)
-        ybatch = y[i:i+batch_size]
-        loss = loss_fn(y_pred, ybatch)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-    print(f'Finished epoch {epoch}, latest loss {loss}')
- 
-# compute accuracy (no_grad is optional)
-with torch.no_grad():
-    y_pred = model(X)
-accuracy = (y_pred.round() == y).float().mean()
-print(f"Accuracy {accuracy}")
 
- 
-# make class predictions with the model
-predictions = (model(X) > 0.5).int()
-for i in range(5):
-    print('%s => %d (expected %d)' % (X[i].tolist(), predictions[i], y[i]))
+class RegressionNet(nn.Module):
+    """
+    A fully connected neural network for regression tasks.
+
+    Attributes:
+        fc1 (nn.Linear): The first fully connected layer.
+        fc2 (nn.Linear): The second fully connected layer.
+        fc3 (nn.Linear): The third fully connected layer.
+        output (nn.Linear): The output layer producing a single value.
+        dropout (nn.Dropout): Dropout layer to prevent overfitting.
+    
+    Methods:
+        forward(x):
+            Defines the forward pass through the network.
+    """
+    def __init__(self, input_size=12, hidden_sizes=[64, 32, 16], output_size=1, dropout_rate=0.3):
+        """
+        Initializes the network with specified input, hidden, and output sizes.
+
+        Args:
+            input_size (int): Number of input features. Default is 12.
+            hidden_sizes (list): Sizes of the hidden layers. Default is [64, 32, 16].
+            output_size (int): Number of output features. Default is 1 (regression output).
+            dropout_rate (float): Dropout rate applied after each hidden layer. Default is 0.3.
+        """
+        super(RegressionNet, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_sizes[0])
+        self.fc2 = nn.Linear(hidden_sizes[0], hidden_sizes[1])
+        self.fc3 = nn.Linear(hidden_sizes[1], hidden_sizes[2])
+        self.output = nn.Linear(hidden_sizes[2], output_size)
+        self.dropout = nn.Dropout(dropout_rate)
+
+    def forward(self, x):
+        """
+        Forward pass through the network.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, input_size).
+
+        Returns:
+            torch.Tensor: Output tensor of shape (batch_size, output_size).
+        """
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = F.relu(self.fc2(x))
+        x = self.dropout(x)
+        x = F.relu(self.fc3(x))
+        x = self.dropout(x)
+        x = self.output(x)  # No activation on the output layer for regression
+        return x
+
+class LogCoshLoss(nn.Module):
+    def __init__(self):
+        super(LogCoshLoss, self).__init__()
+    
+    def forward(self, y_pred, y_true):
+        diff = y_pred - y_true
+        return torch.mean(torch.log(torch.cosh(diff)))
+
+class TrainingPipeline:
+    """
+    A training and evaluation pipeline for neural network models.
+
+    Attributes:
+        train_loader (DataLoader): DataLoader for the training dataset.
+        test_loader (DataLoader): DataLoader for the testing/validation dataset.
+        learning_rate (float): Learning rate for the optimizer.
+        optimizer_type (str): Type of optimizer to use ('SGD' or 'Adam').
+        criterion (nn.Module): Loss function used for training.
+        batch_size (int): Batch size for training and evaluation.
+        num_epochs (int): Number of training epochs.
+        device (torch.device): The device to run the model on ('cuda' or 'cpu').
+        model (nn.Module): The neural network model for regression.
+    
+    Methods:
+        train():
+            Trains the model using the training dataset.
+        evaluate():
+            Evaluates the model using the testing dataset.
+    """
+    def __init__(self, train_loader, test_loader, learning_rate=0.001, optimizer_type="Adam", 
+                 criterion=None, batch_size=32, num_epochs=10):
+        """
+        Initializes the training pipeline with specified parameters.
+
+        Args:
+            train_loader (DataLoader): DataLoader for the training dataset.
+            test_loader (DataLoader): DataLoader for the testing/validation dataset.
+            learning_rate (float): Learning rate for the optimizer. Default is 0.001.
+            optimizer_type (str): Type of optimizer to use ('SGD' or 'Adam'). Default is 'Adam'.
+            criterion (nn.Module, optional): Loss function. Default is nn.MSELoss().
+            batch_size (int): Batch size for training and evaluation. Default is 32.
+            num_epochs (int): Number of training epochs. Default is 10.
+        """
+        self.train_loader = train_loader
+        self.test_loader = test_loader
+        self.learning_rate = learning_rate
+        self.optimizer_type = optimizer_type
+        self.criterion = criterion if criterion is not None else nn.MSELoss()        
+        self.batch_size = batch_size
+        self.num_epochs = num_epochs
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = RegressionNet().to(self.device)
+
+    def _get_optimizer(self):
+        if self.optimizer_type == "SGD":
+            return optim.SGD(self.model.parameters(), lr=self.learning_rate)
+        elif self.optimizer_type == "Adam":
+            return optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        else:
+            raise ValueError(f"Unsupported optimizer type: {self.optimizer_type}")
+
+    def train(self):
+        """
+        Trains the model using the training dataset for the specified number of epochs.
+        Prints the loss after each epoch.
+        """
+        self.model.train()
+        optimizer = self._get_optimizer()
+        for epoch in range(self.num_epochs):
+            running_loss = 0.0
+            for i, (inputs, targets) in enumerate(self.train_loader):
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
+                optimizer.zero_grad()
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, targets)
+                loss.backward()
+                optimizer.step()
+                running_loss += loss.item()
+            print(f"Epoch {epoch + 1}/{self.num_epochs}, Loss: {running_loss / len(self.train_loader):.4f}")
+
+    def evaluate(self):
+        """
+        Evaluates the model using the testing dataset.
+        Prints the average loss over the testing dataset.
+        """
+        self.model.eval()
+        test_loss = 0.0
+        with torch.no_grad():
+            for inputs, targets in self.test_loader:
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, targets)
+                test_loss += loss.item()
+        print(f"Test Loss: {test_loss / len(self.test_loader):.4f}")
