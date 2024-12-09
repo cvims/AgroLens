@@ -115,7 +115,7 @@ class TrainingPipeline:
             return optim.Adam(self.model.parameters(), lr=self.learning_rate)
         else:
             raise ValueError(f"Unsupported optimizer type: {self.optimizer_type}")
-        
+
     def save_model(self, file_path):
         """
         Saves the trained model to the specified file path.
