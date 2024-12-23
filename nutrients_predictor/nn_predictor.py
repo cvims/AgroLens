@@ -139,6 +139,7 @@ class TrainingPipeline:
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 optimizer.zero_grad()
                 outputs = self.model(inputs)
+                outputs = outputs.view(-1)
                 loss = self.criterion(outputs, targets)
                 loss.backward()
                 optimizer.step()
@@ -156,6 +157,7 @@ class TrainingPipeline:
             for inputs, targets in self.test_loader:
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 outputs = self.model(inputs)
+                outputs = outputs.view(-1)
                 loss = self.criterion(outputs, targets)
                 test_loss += loss.item()
         print(f"Test Loss: {test_loss / len(self.test_loader):.4f}")
