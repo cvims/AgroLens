@@ -3,6 +3,7 @@ import os
 import shutil
 import sys
 import time
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from zipfile import ZipFile
@@ -61,9 +62,7 @@ class SentinelApi:
         Returns:
             list[dict]: list of Sentinel 2 datasets, ordered by date difference to the search date
         """
-        print(
-            f"---- Getting Sentinel 2 products for {date} ({latitude}, {longitude})..."
-        )
+        print(f"Getting Sentinel 2 products for {date} ({latitude}, {longitude})...")
         cls.authenticate()
 
         date = datetime.fromisoformat(date)
@@ -132,7 +131,7 @@ class SentinelApi:
             return
 
         os.makedirs(target_path, exist_ok=True)
-        zipfile = Path(target_path) / f"{id}.zip"
+        zipfile = Path(target_path) / f"{dataset_name}.zip"
 
         cls.authenticate()
 
@@ -148,12 +147,15 @@ class SentinelApi:
                 total = int(response.headers.get("content-length"))
                 downloaded = 0
                 print(f"Downloading {round(total / 1048576)} MB to '{zipfile}'...")
-                for chunk in response.iter_content(chunk_size=16777216):  # 16 MB chunks
+                for chunk in response.iter_content(chunk_size=8388608):  # 8 MB chunks
                     if chunk:
-                        progress = round(downloaded * 100 / total)
-                        print(f"  {progress}%", end="\r")
                         file.write(chunk)
-                        downloaded += len(chunk)
+                        if sys.stdout.isatty():
+                            # display progress (only in terminal)
+                            downloaded += len(chunk)
+                            progress = round(downloaded * 100 / total)
+                            print(f"  {progress}%", end="\r")
+
                 print("Download complete")
 
         cls._extract(zipfile, Path(target_path) / dataset_name)
@@ -239,7 +241,7 @@ class SentinelApi:
             return False
         if not os.environ.get("COPERNICUS_TOKEN_EXPIRES"):
             return True
-        return int(os.environ["COPERNICUS_TOKEN_EXPIRES"]) < time.time()
+        return int(os.environ["COPERNICUS_TOKEN_EXPIRES"]) > time.time()
 
     @staticmethod
     def _extract(source_path: Path, target_path: Path) -> None:
@@ -272,11 +274,12 @@ class SentinelApi:
         shutil.rmtree(target_path, True)
 
         with ZipFile(source_path, "r") as zip:
-            zip.extractall(target_path.parent / source_path.stem)
+            zip.extractall(target_path.parent / f"{source_path.stem}_tmp")
             os.remove(source_path)
 
         # move required files to target directory
-        root = target_path.parent / source_path.stem
+        os.mkdir(target_path)
+        root = target_path.parent / f"{source_path.stem}_tmp"
         root = root / os.listdir(root)[0]
         path = root / "GRANULE"
         path = path / os.listdir(path)[0]
@@ -314,9 +317,7 @@ class SentinelApi:
         Returns:
             bool: Returns True if there is a cloud on the given position
         """
-        image_file = (
-            Path(os.environ["TMP_DIR"]) / "cloud_masks" / f"{product["id"]}.jp2"
-        )
+        image_file = Path(os.environ["TMP_DIR"]) / "cloud_masks" / f"{uuid.uuid4()}.jp2"
 
         if not image_file.is_file():
             response = cls.s3.list_objects_v2(
@@ -334,7 +335,10 @@ class SentinelApi:
             cls.s3.download_file("eodata", cloud_mask, image_file)
 
         x, y = ImageUtils.location_to_pixel(image_file, latitude, longitude)
-        return cls._check_cloud_pixel(image_file, x, y)
+        result = cls._check_cloud_pixel(image_file, x, y)
+
+        os.remove(image_file)
+        return result
 
     @staticmethod
     def _check_cloud_pixel(
