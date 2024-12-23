@@ -135,30 +135,41 @@ class SentinelApi:
 
         cls.authenticate()
 
-        # download zipfile from server and display progress
-        with requests.get(
-            cls.DOWNLOAD_URL.replace("#product_id#", id),
-            allow_redirects=True,
-            stream=True,
-            headers={"Authorization": f"Bearer {os.environ["COPERNICUS_TOKEN"]}"},
-        ) as response:
-            response.raise_for_status()
-            with open(zipfile, "wb") as file:
-                total = int(response.headers.get("content-length"))
-                downloaded = 0
-                print(f"Downloading {round(total / 1048576)} MB to '{zipfile}'...")
-                for chunk in response.iter_content(chunk_size=8388608):  # 8 MB chunks
-                    if chunk:
-                        file.write(chunk)
-                        if sys.stdout.isatty():
-                            # display progress (only in terminal)
-                            downloaded += len(chunk)
-                            progress = round(downloaded * 100 / total)
-                            print(f"  {progress}%", end="\r")
+        try:
+            # download zipfile from server and display progress
+            with requests.get(
+                cls.DOWNLOAD_URL.replace("#product_id#", id),
+                allow_redirects=True,
+                stream=True,
+                headers={"Authorization": f"Bearer {os.environ["COPERNICUS_TOKEN"]}"},
+            ) as response:
+                response.raise_for_status()
+                with open(zipfile, "wb") as file:
+                    total = int(response.headers.get("content-length"))
+                    downloaded = 0
+                    print(f"Downloading {round(total / 1048576)} MB to '{zipfile}'...")
+                    for chunk in response.iter_content(
+                        chunk_size=8388608
+                    ):  # 8 MB chunks
+                        if chunk:
+                            file.write(chunk)
+                            if sys.stdout.isatty():
+                                # display progress (only in terminal)
+                                downloaded += len(chunk)
+                                progress = round(downloaded * 100 / total)
+                                print(f"  {progress}%", end="\r")
 
-                print("Download complete")
+                    print("Download complete")
 
-        cls._extract(zipfile, Path(target_path) / dataset_name)
+                    cls._extract(zipfile, Path(target_path) / dataset_name)
+        except Exception as e:
+            try:
+                shutil.rmtree(Path(target_path) / dataset_name, True)
+                shutil.rmtree(Path(target_path) / f"{dataset_name}_tmp", True)
+                os.remove(zipfile)
+            except:
+                pass
+            raise
 
     @staticmethod
     def crop_images(
@@ -178,9 +189,10 @@ class SentinelApi:
 
         path = Path(parent_path) / dataset_name / "IMG_DATA"
 
+        print(f"Cropping images in '{path}'...")
+
         for file in glob.glob("**/*.jp2", root_dir=path, recursive=True):
             file_path = str(path / file)
-            print(f"Cropping image '{file_path}'...")
             ImageUtils.crop_location(file_path, file_path, latitude, longitude, 50)
 
     @staticmethod
@@ -319,25 +331,32 @@ class SentinelApi:
         """
         image_file = Path(os.environ["TMP_DIR"]) / "cloud_masks" / f"{uuid.uuid4()}.jp2"
 
-        if not image_file.is_file():
-            response = cls.s3.list_objects_v2(
-                Bucket="eodata",
-                Prefix=product["properties"]["productIdentifier"].split("/", 2)[2],
-            )
+        try:
+            if not image_file.is_file():
+                response = cls.s3.list_objects_v2(
+                    Bucket="eodata",
+                    Prefix=product["properties"]["productIdentifier"].split("/", 2)[2],
+                )
 
-            cloud_mask = False
-            if "Contents" in response:
-                for obj in response["Contents"]:
-                    if obj["Key"].endswith("/MSK_CLDPRB_20m.jp2"):
-                        cloud_mask = obj["Key"]
+                cloud_mask = False
+                if "Contents" in response:
+                    for obj in response["Contents"]:
+                        if obj["Key"].endswith("/MSK_CLDPRB_20m.jp2"):
+                            cloud_mask = obj["Key"]
 
-            os.makedirs(image_file.parent, exist_ok=True)
-            cls.s3.download_file("eodata", cloud_mask, image_file)
+                os.makedirs(image_file.parent, exist_ok=True)
+                cls.s3.download_file("eodata", cloud_mask, image_file)
 
-        x, y = ImageUtils.location_to_pixel(image_file, latitude, longitude)
-        result = cls._check_cloud_pixel(image_file, x, y)
+            x, y = ImageUtils.location_to_pixel(image_file, latitude, longitude)
+            result = cls._check_cloud_pixel(image_file, x, y)
+        except:
+            raise
+        finally:
+            try:
+                os.remove(image_file)
+            except:
+                pass
 
-        os.remove(image_file)
         return result
 
     @staticmethod
