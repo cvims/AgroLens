@@ -1,17 +1,18 @@
-from datetime import datetime, timedelta
 import glob
 import os
-from pathlib import Path
-import re
-import requests
 import shutil
 import sys
 import time
+from datetime import datetime, timedelta
+from pathlib import Path
 from zipfile import ZipFile
-from utils.image_utils import ImageUtils
-import rasterio
-import numpy as np
 
+import boto3
+import numpy as np
+import rasterio
+import requests
+
+from utils.image_utils import ImageUtils
 
 
 class SentinelApi:
@@ -24,6 +25,17 @@ class SentinelApi:
     DOWNLOAD_URL = (
         "https://zipper.dataspace.copernicus.eu/odata/v1/Products(#product_id#)/$value"
     )
+    AWS_ENDPOINT_URL = "https://eodata.dataspace.copernicus.eu"
+    AWS_BUCKET = "eodata.dataspace.copernicus.eu"
+
+    session = boto3.session.Session()
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=AWS_ENDPOINT_URL,
+        aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+        region_name="default",
+    )
 
     @classmethod
     def get_data(
@@ -31,8 +43,8 @@ class SentinelApi:
         date: str,
         latitude: float,
         longitude: float,
-        span: int = 30,
-        cloudCover: int = 50,
+        span: int = 14,
+        filter_clouds: bool = True,
         limit: int = 1,
     ) -> list[dict]:
         """
@@ -42,26 +54,29 @@ class SentinelApi:
             date (str): Date in YYYY-MM-DD format
             latitude (float): GPS latitude
             longitude (float): GPS longitude
-            span (int, optional): Maximum span of days to search, defaults to 30.
-            cloudCover (int, optional): Maximum percent of cloud coverage in the tile, defaults to 50.
+            span (int, optional): Maximum span of days to search in each direction (past and future), defaults to 14.
+            filter_clouds (bool, optional): Should images with clouds above the GPS position be filtered?, defaults to True.
             limit (int, optional): Maximum number of returned entries, defaults to 1.
 
         Returns:
-            list[dict]: list of Sentinel 2 datasets, ordered by newest date
+            list[dict]: list of Sentinel 2 datasets, ordered by date difference to the search date
         """
+        print(
+            f"---- Getting Sentinel 2 products for {date} ({latitude}, {longitude})..."
+        )
         cls.authenticate()
 
-        end = datetime.fromisoformat(date) + timedelta(days=1)
-        start = end - timedelta(days=span)
+        date = datetime.fromisoformat(date)
+        start = date - timedelta(days=span)
+        end = date + timedelta(days=span + 1)
 
         query = (
             f"{cls.API_URL}"
-            f"?startDate={start.isoformat()}Z"
+            f"?productType=S2MSI2A"
+            f"&startDate={start.isoformat()}Z"
             f"&completionDate={end.isoformat()}Z"
-            f"&maxRecords={limit}"
             f"&lat={latitude}"
             f"&lon={longitude}"
-            f"&cloudCover=[0,{cloudCover}]"
             "&sortParam=startDate&sortOrder=descending"
         )
 
@@ -79,7 +94,25 @@ class SentinelApi:
             )
             return None
 
-        return data["features"]
+        products = data["features"]
+        # sort results by difference to the desired date
+        products.sort(key=lambda product: cls._productTimestampDiff(product, date))
+
+        if not filter_clouds:
+            return products[:limit]
+
+        result = []
+        for product in products:
+            if len(result) >= limit:
+                break
+            if cls._cloud_covered(product, latitude, longitude):
+                print(
+                    f"Product '{product["id"]}' ({product["properties"]["startDate"]}) has been cloud filtered."
+                )
+            else:
+                result.append(product)
+
+        return result
 
     @classmethod
     def download_data(cls, id: str, dataset_name: str, target_path: str = None) -> None:
@@ -125,7 +158,6 @@ class SentinelApi:
 
         cls._extract(zipfile, Path(target_path) / dataset_name)
 
-
     @staticmethod
     def crop_images(
         dataset_name: str, latitude: float, longitude: float, parent_path: str = None
@@ -148,6 +180,22 @@ class SentinelApi:
             file_path = str(path / file)
             print(f"Cropping image '{file_path}'...")
             ImageUtils.crop_location(file_path, file_path, latitude, longitude, 50)
+
+    @staticmethod
+    def _productTimestampDiff(product: dict, date: datetime) -> int:
+        """
+        Calculates the difference between the product date and the given date in seconds.
+        Used to sort the api result list
+
+        Args:
+            product (dict): Sentinel 2 product dict
+            date (datetime): Desired date
+
+        Returns:
+            int: Time difference in seconds
+        """
+        startDate = datetime.fromisoformat(product["properties"]["startDate"])
+        return abs(date.timestamp() - startDate.timestamp())
 
     @classmethod
     def authenticate(cls) -> None:
@@ -252,28 +300,67 @@ class SentinelApi:
 
         shutil.rmtree(root.parent)
 
-    @staticmethod
-    def _check_cloud_pixel(input_file, threshold=20):
+    @classmethod
+    def _cloud_covered(cls, product: dict, latitude: float, longitude: float) -> bool:
         """
-            Checks whether the middle pixel and the 5 neighboring pixels are covered by clouds.
-            
-            Parameters:
-                input_file (str): Path to the input file (GeoTIFF with bands).
-                threshold (int): Threshold value for cloud probability.
-            
-            Returns:
-                bool: True if clouds cover the middle pixel or neighboring pixels, otherwise False.
+        Checks if there is a cloud on the given GPS position of the given product
+        by downloading and checking the cloud mask from S3.
+
+        Parameters:
+            product (dict): Product dict from the Copernicus API
+            latitude (float): GPS latitude
+            longitude (float): GPS longitude
+
+        Returns:
+            bool: Returns True if there is a cloud on the given position
+        """
+        image_file = (
+            Path(os.environ["TMP_DIR"]) / "cloud_masks" / f"{product["id"]}.jp2"
+        )
+
+        if not image_file.is_file():
+            response = cls.s3.list_objects_v2(
+                Bucket="eodata",
+                Prefix=product["properties"]["productIdentifier"].split("/", 2)[2],
+            )
+
+            cloud_mask = False
+            if "Contents" in response:
+                for obj in response["Contents"]:
+                    if obj["Key"].endswith("/MSK_CLDPRB_20m.jp2"):
+                        cloud_mask = obj["Key"]
+
+            os.makedirs(image_file.parent, exist_ok=True)
+            cls.s3.download_file("eodata", cloud_mask, image_file)
+
+        x, y = ImageUtils.location_to_pixel(image_file, latitude, longitude)
+        return cls._check_cloud_pixel(image_file, x, y)
+
+    @staticmethod
+    def _check_cloud_pixel(
+        input_file: str, x: int, y: int, radius: int = 5, threshold: int = 20
+    ) -> bool:
+        """
+        Checks whether the given pixel and its neighboring pixels are covered by clouds.
+
+        Parameters:
+            input_file (str): Path to the input file (GeoTIFF with bands).
+            x (int): Pixel x-coordinate
+            y (int): Pixel y-coordinate
+            radius (int): Pixel radius to check.
+            threshold (int): Threshold value for cloud probability.
+
+        Returns:
+            bool: True if clouds cover the middle pixel or neighboring pixels, otherwise False.
         """
         with rasterio.open(input_file) as src:
-            # Determine image size and center
-            height, width = src.height, src.width
-            center_row, center_col = height // 2, width // 2
-            
             cloud_band = src.read(1)  # Band 1 for MSK_CLDPRB
             # Select middle pixel and neighboring pixel
-            region = cloud_band[center_row-2:center_row+2, center_col-2:center_col+2]
+            region = cloud_band[
+                y - radius : y + radius,
+                x - radius : x + radius,
+            ]
             # Check whether a pixel is above the threshold value
             cloud_present = np.any(region >= threshold)
 
         return cloud_present
-
