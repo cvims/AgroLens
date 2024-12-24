@@ -52,6 +52,7 @@ crop_jobs = []
 api_threads = 0
 download_threads = 0
 crop_threads = 0
+mapping_file = ""
 
 dataframe: pd.DataFrame
 data_length: 0
@@ -61,7 +62,7 @@ download_finished = False
 
 
 def setup_parser() -> argparse.Namespace:
-    global api_threads, download_threads, crop_threads
+    global api_threads, download_threads, crop_threads, mapping_file
 
     parser = argparse.ArgumentParser(
         description="Downloads and crops all Sentinel 2 images in the given CSV table. \n\n"
@@ -104,11 +105,16 @@ def setup_parser() -> argparse.Namespace:
     parser.add_argument(
         "--input", "-f", help="Path to input LUCAS SOIL CSV file", required=True
     )
+    parser.add_argument(
+        "--mapping", "-m", help="Path to save the mapping CSV", nargs="?", default=""
+    )
     args = parser.parse_args()
 
     api_threads = int(args.api_threads)
     download_threads = int(args.download_threads)
     crop_threads = int(args.worker_threads)
+    if args.mapping:
+        mapping_file = os.path.realpath(args.mapping)
 
     return args
 
@@ -147,6 +153,13 @@ def api_thread(thread_index: int) -> None:
             data = data[0]
             sentinel_date = data["properties"]["startDate"].split("T")[0]
             print(f"Best dataset: {data["id"]} ({sentinel_date})")
+
+            if mapping_file:
+                with open(mapping_file, "a") as file:
+                    print(
+                        f"{row["POINTID"]},{date},{latitude},{longitude},{sentinel_date},{data["id"]}",
+                        file=file,
+                    )
 
             download_jobs.append(
                 {
@@ -234,9 +247,17 @@ def crop_thread(thread_index: int) -> None:
 
 
 def main():
-    global dataframe, data_length, api_threads, download_threads, crop_threads, api_finished, download_finished
+    global dataframe, data_length, api_threads, download_threads, crop_threads, api_finished, download_finished, mapping_file
 
     args = setup_parser()
+
+    if mapping_file:
+        if not os.path.isfile(mapping_file):
+            with open(mapping_file, "w") as file:
+                print(
+                    "POINTID,SURVEY_DATE,TH_LAT,TH_LONG,SENTINEL_DATE,SENTINEL_ID",
+                    file=file,
+                )
 
     data = pd.read_csv(args.input, sep=",", header=0)
 
