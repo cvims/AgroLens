@@ -82,11 +82,16 @@ def main():
         )
 
         # Sentinel dataset does not exist, drop row
-        if not path.is_dir():
-            drop.append(index)
+        try:
+            if not path.is_dir():
+                drop.append(index)
+                continue
+        except:
+            print(f"Could not open '{path}'!")
             continue
 
         # iterate over every band and every resolution and try until a value is found
+        empty = True
         for band in bands:
             for resolution in resolutions:
                 value = -1
@@ -101,8 +106,14 @@ def main():
                         )
                         pass
                 if value >= 0:
+                    empty = False
                     output.at[index, band] = value
                     break
+
+        # drop rows without any band data
+        if empty:
+            drop.append(index)
+            continue
 
     # drop all datasets without Sentinel values
     print(f"Dropping {len(drop)} rows...")
