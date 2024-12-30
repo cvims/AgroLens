@@ -4,6 +4,7 @@ import os
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from sklearn import preprocessing
 
@@ -29,10 +30,18 @@ def setup_parser() -> argparse.Namespace:
     )
     parser.add_argument(
         "--normalize",
+        "-n",
         help="Add normalized Sentinel 2 columns?",
         default=False,
         const=True,
         nargs="?",
+    )
+    parser.add_argument(
+        "--shape",
+        "-s",
+        help="Define band shape to set the amount of pixels to include (default: 1x1)",
+        nargs="?",
+        default="1x1",
     )
     return parser.parse_args()
 
@@ -44,6 +53,9 @@ def main():
 
     input = pd.read_csv(args.input, sep=",", header=0)
     mapping = pd.read_csv(args.mapping, sep=",", header=0)
+
+    shape = args.shape.split("x")
+    shape = tuple([int(x) for x in shape])
 
     # drop duplicate columns
     mapping.drop(columns=["SURVEY_DATE", "TH_LAT", "TH_LONG"], inplace=True)
@@ -94,18 +106,19 @@ def main():
         empty = True
         for band in bands:
             for resolution in resolutions:
-                value = -1
+                value = None
                 file = path / resolution / f"{band}.jp2"
                 if file.is_file():
                     try:
-                        value = ImageUtils.get_pixel_value(str(file), 50, 50)
+                        value = ImageUtils.get_pixel_value(str(file), 50, 50, shape)
                     except:
                         print(
                             f"Could not get value of point {row["POINTID"]}, band {band} ({resolution})!",
                             file=sys.stderr,
                         )
                         pass
-                if value >= 0:
+
+                if value is not None:
                     empty = False
                     output.at[index, band] = value
                     break
@@ -119,6 +132,13 @@ def main():
     print(f"Dropping {len(drop)} rows...")
     output.drop(output.index[drop], inplace=True)
 
+    # drop all rows where all bands are zero
+    output = output.loc[(output[bands] != 0).all(axis=1)]
+
+    # drop redundant second index and create new index
+    output.drop(output.columns[0], axis=1, inplace=True)
+    output.reset_index(drop=True, inplace=True)
+
     if args.normalize:
         scaler = preprocessing.MinMaxScaler()
         normalizer = scaler.fit_transform(output[bands])
@@ -126,8 +146,6 @@ def main():
         names = [i + "_normalized" for i in bands]
         normalized.columns = names
         output = pd.merge(output, normalized, left_index=True, right_index=True)
-        # drop redundant second index
-        output.drop(output.columns[0], axis=1, inplace=True)
 
     output.to_csv(args.output, sep=",")
     print(f"New data table saved to '{args.output}'.")

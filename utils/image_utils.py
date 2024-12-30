@@ -1,3 +1,6 @@
+import math
+from typing import Tuple
+
 import cv2
 from osgeo import gdal, osr
 
@@ -115,7 +118,9 @@ class ImageUtils:
         cv2.imwrite(target, merged)
 
     @staticmethod
-    def get_pixel_value(image: str, x: int, y: int) -> int:
+    def get_pixel_value(
+        image: str, x: int, y: int, shape: Tuple[int, int] = (1, 1)
+    ) -> int | list:
         """
         Returns the value of the given pixel of a grayscale image.
 
@@ -123,9 +128,25 @@ class ImageUtils:
             image (str): Path of the image
             x (int): Pixel x-coordinate
             y (int): Pixel y-coordinate
+            shape ((int, int), optional): Shape of the resulting matrix (default: single value)
 
         Returns:
-            int: Grayscale integer value of the pixel
+            int | list: Grayscale integer value of a single pixel or a value matrix (depends on shape)
         """
         img = cv2.imread(image, 0)
-        return img[y, x]
+
+        if not shape or shape == (1, 1):
+            # return single pixel value
+            return img[y, x]
+
+        # cut pixels in the right shape (ceil and floor to allow even shapes, e.g. 2x2)
+        radius = [
+            math.floor((shape[0] - 1) / 2),
+            math.ceil((shape[0] - 1) / 2),
+            math.floor((shape[1] - 1) / 2),
+            math.ceil((shape[1] - 1) / 2),
+        ]
+        return img[
+            y - radius[2] : y + radius[3] + 1,
+            x - radius[0] : x + radius[1] + 1,
+        ]
