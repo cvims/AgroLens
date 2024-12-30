@@ -50,13 +50,12 @@ def objective(trial):
     model = xgb.train(param,dtrain)
 
     Y_pred = model.predict(dtest)
+    mse = mean_squared_error(Y_test, Y_pred)
 
-    rmse = mean_squared_error(Y_test, Y_pred)
-
-    return rmse
+    return mse
 
 study = optuna.create_study(direction='minimize')  #Minimize RMSE
 study.optimize(objective, n_trials=100)
 
 print("Beste Hyperparameter:", study.best_params)
-print("Bester RMSE-Wert:", study.best_value)
+print("Bester MSE-Wert:", study.best_value)
