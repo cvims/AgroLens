@@ -37,13 +37,26 @@ def setup_parser() -> argparse.Namespace:
         nargs="?",
     )
     parser.add_argument(
+        "--flatten",
+        "-f",
+        help="Flatten Sentinel 2 value matrices into separate columns? (Only useful when 'shape' is a matrix)",
+        default=False,
+        const=True,
+        nargs="?",
+    )
+    parser.add_argument(
         "--shape",
         "-s",
         help="Define band shape to set the amount of pixels to include (default: 1x1)",
         nargs="?",
         default="1x1",
     )
-    return parser.parse_args()
+
+    args = parser.parse_args()
+    # do not flatten a single value
+    if args.shape == "1x1":
+        args.flatten = False
+    return args
 
 
 def main():
@@ -82,8 +95,12 @@ def main():
     drop = []
 
     # create columns in output dataset
+    columns = shape[0] * shape[1]
     for band in bands:
         output[band] = None
+        if columns > 1:
+            for i in range(columns):
+                output[f"{band}_{i+1}"] = None
 
     for index, row in output.iterrows():
         path = (
@@ -119,8 +136,15 @@ def main():
                         pass
 
                 if value is not None:
-                    empty = False
+                    if np.any(value):
+                        # drop rows where all bands are zero
+                        empty = False
                     output.at[index, band] = value
+                    if args.flatten:
+                        # copy pixel values from matrix to new columns
+                        value = value.reshape(-1)
+                        for i in range(value.shape[0]):
+                            output.at[index, f"{band}_{i+1}"] = value[i]
                     break
 
         # drop rows without any band data
@@ -131,9 +155,6 @@ def main():
     # drop all datasets without Sentinel values
     print(f"Dropping {len(drop)} rows...")
     output.drop(output.index[drop], inplace=True)
-
-    # drop all rows where all bands are zero
-    output = output.loc[(output[bands] != 0).all(axis=1)]
 
     # drop redundant second index and create new index
     output.drop(output.columns[0], axis=1, inplace=True)
@@ -146,6 +167,11 @@ def main():
         names = [i + "_normalized" for i in bands]
         normalized.columns = names
         output = pd.merge(output, normalized, left_index=True, right_index=True)
+
+    if shape != (1, 1):
+        # convert numpy arrays to strings
+        output[bands] = output[bands].astype(str)
+        output.replace("\n", "", regex=True, inplace=True)
 
     output.to_csv(args.output, sep=",")
     print(f"New data table saved to '{args.output}'.")
