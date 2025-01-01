@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from optuna.trial import TrialState
 
 
 class RegressionNet(nn.Module):
@@ -86,7 +87,7 @@ class TrainingPipeline:
         evaluate():
             Evaluates the model using the testing dataset.
     """
-    def __init__(self, train_loader, test_loader, learning_rate=0.001, optimizer_type="Adam", 
+    def __init__(self, train_loader, test_loader, model, learning_rate=0.001, optimizer_type="Adam", 
                  criterion=None, batch_size=32, num_epochs=10):
         """
         Initializes the training pipeline with specified parameters.
@@ -108,7 +109,7 @@ class TrainingPipeline:
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = RegressionNet().to(self.device)
+        self.model = model.to(self.device)
 
     def _get_optimizer(self):
         if self.optimizer_type == "SGD":
@@ -148,6 +149,13 @@ class TrainingPipeline:
                 running_loss += loss.item()
             print(f"Epoch {epoch + 1}/{self.num_epochs}, Loss: {running_loss / len(self.train_loader):.4f}")
 
+        print('Overview trained model:',self.model)
+        total_params = sum(p.numel() for p in self.model.parameters())
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        print(f'Total parameters: {total_params}')
+        print(f'Trainable parameters: {trainable_params}')
+
+
     def evaluate(self):
         """
         Evaluates the model using the testing dataset.
@@ -162,11 +170,41 @@ class TrainingPipeline:
                 outputs = outputs.view(-1)
                 loss = self.criterion(outputs, targets)
                 test_loss += loss.item()
-        print(f"Test Loss: {test_loss / len(self.test_loader):.4f}")
+        avg_test_loss = test_loss / len(self.test_loader)
+        print(f"Test Loss: {avg_test_loss:.4f}")
+        return avg_test_loss
 
+def objective(trial, train_loader, test_loader):
+    # Define the hyperparameters to optimize
+    input_size = 12
+    hidden_sizes = [
+        trial.suggest_int("hidden_size_1", 16, 128, step=16),
+        trial.suggest_int("hidden_size_2", 8, 64, step=8),
+        trial.suggest_int("hidden_size_3", 4, 32, step=4)
+    ]
+    dropout_rate = trial.suggest_float("dropout_rate", 0.1, 0.5)
+    learning_rate = trial.suggest_float("learning_rate", 1e-4, 1e-2, log=True)
+    optimizer_type = trial.suggest_categorical("optimizer", ["SGD", "Adam"])
+    batch_size = trial.suggest_categorical("batch_size", [16, 32, 64])
 
-# def objective(trial):
-#     model = RegressionNet
+    model = RegressionNet(input_size=input_size, hidden_sizes=hidden_sizes, dropout_rate=dropout_rate)
+    pipeline = TrainingPipeline(
+        train_loader=train_loader,
+        test_loader=test_loader,
+        model = model,
+        learning_rate=learning_rate,
+        optimizer_type=optimizer_type,
+        criterion=nn.MSELoss(),
+        batch_size=batch_size,
+        num_epochs=5
+    )
+
+    # Train the model and evaluate its performance
+    pipeline.train()
+    test_loss = pipeline.evaluate()
+    
+    return test_loss  # Optuna minimizes this value
+
     
 def run_nn_train(train_loader, test_loader):
     """
@@ -176,17 +214,35 @@ def run_nn_train(train_loader, test_loader):
 
         """
 
-    # Initialize TrainingPipeline
-    batch_size = 5
-    pipeline = TrainingPipeline(
-        train_loader=train_loader,
-        test_loader=test_loader,
-        learning_rate=0.001,
-        optimizer_type="Adam",
-        criterion=nn.MSELoss(), 
-        batch_size=batch_size,
-        num_epochs=5
-    )
-    print('-----Start model training: Neuronal network-----')
-    pipeline.train()
-    pipeline.evaluate()
+    # # Initialize TrainingPipeline
+    # batch_size = 5
+    # pipeline = TrainingPipeline(
+    #     train_loader=train_loader,
+    #     test_loader=test_loader,
+    #     learning_rate=0.001,
+    #     optimizer_type="SGD",
+    #     criterion=nn.MSELoss(), 
+    #     batch_size=batch_size,
+    #     num_epochs=5
+    # )
+    # print('-----Start model training: Neuronal network-----')
+    # pipeline.train()
+    # pipeline.evaluate()
+
+    study = optuna.create_study(direction='minimize')
+    study.optimize(lambda trial: objective(trial,train_loader,test_loader), n_trials=10, timeout=600)
+
+    pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
+    complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
+
+    print("Study statistics: ")
+    print("  Number of finished trials: ", len(study.trials))
+    print("  Number of pruned trials: ", len(pruned_trials))
+    print("  Number of complete trials: ", len(complete_trials))
+
+    print("Best trial:")
+    trial = study.best_trial
+    print("  Value: ", trial.value)
+    print("  Params: ")
+    for key, value in trial.params.items():
+        print("    {}: {}".format(key, value))
