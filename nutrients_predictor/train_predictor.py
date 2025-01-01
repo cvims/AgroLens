@@ -1,5 +1,5 @@
 import dataloader_predictor as DL
-import nn_predictor as NN_Pred
+import nn_predictor as nn_pred
 import pandas as pd
 import torch.nn as nn
 import xgboost_predictor
@@ -33,22 +33,8 @@ def main():
     elif model_var == 'nn':
         # Erstelle Dataloader für Training und Test
         train_loader, test_loader = dataloader_creator.create_dataloaders()
+        nn_pred.run_nn_train(train_loader, test_loader)
 
-        # Initialize TrainingPipeline
-        batch_size = 5
-        pipeline = NN_Pred.TrainingPipeline(
-            train_loader=train_loader,
-            test_loader=test_loader,
-            learning_rate=0.001,
-            optimizer_type="Adam",
-            criterion=nn.MSELoss(), 
-            batch_size=batch_size,
-            num_epochs=5
-        )
-        print('-----Start model training: Neuronal network-----')
-        pipeline.train()
-        pipeline.evaluate()
-        
     elif model_var == 'rf': # Random forest
         print('-----Start model training: Random Forest-----')
 

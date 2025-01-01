@@ -1,3 +1,5 @@
+import dataloader_predictor as DL
+import optuna
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -161,3 +163,30 @@ class TrainingPipeline:
                 loss = self.criterion(outputs, targets)
                 test_loss += loss.item()
         print(f"Test Loss: {test_loss / len(self.test_loader):.4f}")
+
+
+# def objective(trial):
+#     model = RegressionNet
+    
+def run_nn_train(train_loader, test_loader):
+    """
+        Runs the training of a regression neuronal network using optuna
+
+        Args:
+
+        """
+
+    # Initialize TrainingPipeline
+    batch_size = 5
+    pipeline = TrainingPipeline(
+        train_loader=train_loader,
+        test_loader=test_loader,
+        learning_rate=0.001,
+        optimizer_type="Adam",
+        criterion=nn.MSELoss(), 
+        batch_size=batch_size,
+        num_epochs=5
+    )
+    print('-----Start model training: Neuronal network-----')
+    pipeline.train()
+    pipeline.evaluate()
