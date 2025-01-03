@@ -7,7 +7,7 @@ from datetime import datetime
 import requests
 
 API_KEY = input("API Key: ")
-CSV_PATH = "/media/data/Datasets/Model_A_Dataset_v2_2024-12-28.csv"
+CSV_PATH = "/media/data/Datasets/Model_A+_Soil+Sentinel_2025-01-03.csv"
 FULL_DAY_SECONDS = 86400  # 24*60*60s
 
 def main():
@@ -16,9 +16,9 @@ def main():
     appends weather data (including the delta time from sunrise to sunset),
     and writes a new CSV with the combined data.
     """
-    # ----------------------------
+    # -----------------------------
     # Read the CSV file into memory
-    # ----------------------------
+    # -----------------------------
     with open(CSV_PATH, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         rows = list(reader)
@@ -26,16 +26,16 @@ def main():
     row_count = len(rows)
     print(f"Found {row_count} rows in {CSV_PATH}.")
 
-    # -----------------------------------------------------------------
+    # -------------------------------------------------------------------
     # By default, let's consider ONLY the first row to save on API calls.
     # Comment out this line if you want to process ALL rows.
-    # -----------------------------------------------------------------
+    # -----------------------------------------------------------------------------
     # rows = [rows[0]]  # <-- comment or remove this line to iterate over every row
-    # -----------------------------------------------------------------
+    # -----------------------------------------------------------------------------
 
-    # --------------------------------------------
+    # ----------------------------------------------------------
     # Prepare output CSV path (e.g. "whatever_with_weather.csv")
-    # --------------------------------------------
+    # ----------------------------------------------------------
     base, ext = os.path.splitext(CSV_PATH)
     output_csv_path = f"{base}_with_weather{ext}"
 
@@ -70,22 +70,22 @@ def main():
     new_fieldnames = list(new_fieldnames)
     new_fieldnames.extend(extra_fields)
 
-    # ----------------------------
+    # -------------------------------
     # Open the output CSV for writing
-    # ----------------------------
+    # -------------------------------
     with open(output_csv_path, "w", newline="", encoding="utf-8") as out_f:
         writer = csv.DictWriter(out_f, fieldnames=new_fieldnames)
         writer.writeheader()
 
-        # ----------------------------------------
+        # ---------------------------------------
         # Process each row and make the API calls
-        # ----------------------------------------
+        # ---------------------------------------
         for index, row in enumerate(rows, start=1):
             date_str = row.get("SENTINEL_DATE", "").strip()
 
             # 1) Check we have a valid date string
             if not date_str:
-                print(f"[{index}] Missing SENTINEL_DATE, skipping.")
+                print(f"[{index}] POINTID {row.get('POINTID','')} Missing SENTINEL_DATE, skipping.")
                 writer.writerow(row)  # Write the row without weather data
                 continue
 
@@ -93,7 +93,7 @@ def main():
             try:
                 date_obj = datetime.strptime(date_str, "%Y-%m-%d")
             except ValueError:
-                print(f"[{index}] Invalid date format for SENTINEL_DATE={date_str}, skipping.")
+                print(f"[{index}] POINTID {row.get('POINTID','')} Invalid date format for SENTINEL_DATE={date_str}, skipping.")
                 writer.writerow(row)  # Write the row as-is
                 continue
 
@@ -105,11 +105,22 @@ def main():
                 lat = float(row["TH_LAT"])
                 lon = float(row["TH_LONG"])
             except (ValueError, KeyError) as e:
-                print(f"[{index}] Missing or invalid TH_LAT/TH_LONG: {e}")
+                print(f"[{index}] POINTID {row.get('POINTID','')} Missing or invalid TH_LAT/TH_LONG: {e}")
                 writer.writerow(row)  # Write the row as-is
                 continue
 
-            # 3) Construct the OpenWeather "timemachine" URL
+            # 3) Ensure that the data does not already exist to prevent unnecessary API requests
+            try:
+                if row["OW_lat"] and row["OW_lon"]:
+                    print(f"[{index}] POINTID {row.get('POINTID','')} vales are already provided.")
+                    writer.writerow(row)  # Write the row as-is
+                    continue
+            except (ValueError, KeyError) as e:
+                print(f"[{index}] POINTID {row.get('POINTID','')} Missing or invalid OW_lat/OW_long: {e}")
+                writer.writerow(row)  # Write the row as-is
+                continue
+
+            # 4) Construct the OpenWeather "timemachine" URL
             url = (
                 "https://api.openweathermap.org/data/3.0/onecall/timemachine"
                 f"?lat={lat:.5f}"
@@ -120,7 +131,7 @@ def main():
 
             print(f"[{index}] POINTID {row.get('POINTID','')} Request => {url}")
 
-            # 4) Send the GET request
+            # 5) Send the GET request
             try:
                 response = requests.get(url, timeout=30)
                 if not response.ok:
