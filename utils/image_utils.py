@@ -2,6 +2,7 @@ import math
 from typing import Tuple
 
 import cv2
+import numpy as np
 from osgeo import gdal, osr
 
 
@@ -67,6 +68,7 @@ class ImageUtils:
         """
         Crops the image to a given radius around a center point (in pixels).
         The given point is in the exact center of the cropped image.
+        If the given point is too close to the image border, the missing pixels are filled black.
 
         Parameters:
             source (str): Path of the source image
@@ -76,7 +78,36 @@ class ImageUtils:
             radius (int): Radius (determines the image size -> 2 x radius + 1)
         """
         img = cv2.imread(source)
-        cropped = img[y - radius : y + radius + 1, x - radius : x + radius + 1]
+        size = 2 * radius + 1
+        height, width = img.shape[:2]
+
+        # fill result matrix with black
+        cropped = np.zeros((size, size, img.shape[2]), dtype=np.uint8)
+
+        # get corner coordinates of the cropping region
+        x_start, x_end = x - radius, x + radius + 1
+        y_start, y_end = y - radius, y + radius + 1
+
+        # make sure the cropping corners are not outside of the image
+        crop_x_start = max(0, x_start)
+        crop_x_end = min(width, x_end)
+        crop_y_start = max(0, y_start)
+        crop_y_end = min(height, y_end)
+
+        # crop pixels out of the original image
+        crop = img[crop_y_start:crop_y_end, crop_x_start:crop_x_end]
+
+        # move the cropping coordinates to the right place of the result matrix
+        # this makes sure the center pixel is always in the center
+        x_start = max(0, -x_start)
+        y_start = max(0, -y_start)
+
+        # copy the cropped pixels to the right place in the result matrix
+        cropped[
+            y_start : y_start + crop.shape[0],
+            x_start : x_start + crop.shape[1],
+        ] = crop
+
         cv2.imwrite(target, cropped)
 
     @classmethod
