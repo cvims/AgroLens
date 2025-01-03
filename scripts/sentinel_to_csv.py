@@ -56,6 +56,11 @@ def setup_parser() -> argparse.Namespace:
     # do not flatten a single value
     if args.shape == "1x1":
         args.flatten = False
+    elif args.normalize and not args.flatten:
+        raise ValueError(
+            "You cannot use '--normalize' on a matrix without '--flatten'!"
+        )
+
     return args
 
 
@@ -95,12 +100,15 @@ def main():
     drop = []
 
     # create columns in output dataset
-    columns = shape[0] * shape[1]
+    normalize_columns = []
     for band in bands:
         output[band] = None
-        if columns > 1:
-            for i in range(columns):
+        if args.flatten:
+            for i in range(shape[0] * shape[1]):
                 output[f"{band}_{i+1}"] = None
+                normalize_columns.append(f"{band}_{i+1}")
+        else:
+            normalize_columns.append(band)
 
     for index, row in output.iterrows():
         path = (
@@ -162,9 +170,9 @@ def main():
 
     if args.normalize:
         scaler = preprocessing.MinMaxScaler()
-        normalizer = scaler.fit_transform(output[bands])
+        normalizer = scaler.fit_transform(output[normalize_columns])
         normalized = pd.DataFrame(normalizer)
-        names = [i + "_normalized" for i in bands]
+        names = [i + "_normalized" for i in normalize_columns]
         normalized.columns = names
         output = pd.merge(output, normalized, left_index=True, right_index=True)
 
