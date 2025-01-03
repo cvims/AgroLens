@@ -103,7 +103,7 @@ def setup_parser() -> argparse.Namespace:
         "--end", help="Last CSV row to download", nargs="?", default="0"
     )
     parser.add_argument(
-        "--input", "-f", help="Path to input LUCAS SOIL CSV file", required=True
+        "--input", "-i", help="Path to input LUCAS SOIL CSV file", required=True
     )
     parser.add_argument(
         "--mapping", "-m", help="Path to save the mapping CSV", nargs="?", default=""

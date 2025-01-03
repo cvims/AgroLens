@@ -76,7 +76,9 @@ class SentinelApi:
             f"&completionDate={end.isoformat()}Z"
             f"&lat={latitude}"
             f"&lon={longitude}"
-            "&sortParam=startDate&sortOrder=descending"
+            "&radius=500"
+            "&sortParam=startDate"
+            "&sortOrder=descending"
         )
 
         response = requests.get(
