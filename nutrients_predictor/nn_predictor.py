@@ -1,7 +1,10 @@
+import dataloader_predictor as DL
+import optuna
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from optuna.trial import TrialState
 
 
 class RegressionNet(nn.Module):
@@ -70,13 +73,13 @@ class TrainingPipeline:
     Attributes:
         train_loader (DataLoader): DataLoader for the training dataset.
         test_loader (DataLoader): DataLoader for the testing/validation dataset.
+        model (nn.Module): The neural network model for regression.
         learning_rate (float): Learning rate for the optimizer.
         optimizer_type (str): Type of optimizer to use ('SGD' or 'Adam').
         criterion (nn.Module): Loss function used for training.
         batch_size (int): Batch size for training and evaluation.
         num_epochs (int): Number of training epochs.
         device (torch.device): The device to run the model on ('cuda' or 'cpu').
-        model (nn.Module): The neural network model for regression.
     
     Methods:
         train():
@@ -84,7 +87,7 @@ class TrainingPipeline:
         evaluate():
             Evaluates the model using the testing dataset.
     """
-    def __init__(self, train_loader, test_loader, learning_rate=0.001, optimizer_type="Adam", 
+    def __init__(self, train_loader, test_loader, model, learning_rate=0.001, optimizer_type="Adam", 
                  criterion=None, batch_size=32, num_epochs=10):
         """
         Initializes the training pipeline with specified parameters.
@@ -106,7 +109,7 @@ class TrainingPipeline:
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = RegressionNet().to(self.device)
+        self.model = model.to(self.device)
 
     def _get_optimizer(self):
         if self.optimizer_type == "SGD":
@@ -115,16 +118,6 @@ class TrainingPipeline:
             return optim.Adam(self.model.parameters(), lr=self.learning_rate)
         else:
             raise ValueError(f"Unsupported optimizer type: {self.optimizer_type}")
-
-    def save_model(self, file_path):
-        """
-        Saves the trained model to the specified file path.
-
-        Args:
-            file_path (str): The path where the model will be saved.
-        """
-        torch.save(self.model.state_dict(), file_path)
-        print(f"Model saved to {file_path}")
 
     def train(self):
         """
@@ -146,6 +139,12 @@ class TrainingPipeline:
                 running_loss += loss.item()
             print(f"Epoch {epoch + 1}/{self.num_epochs}, Loss: {running_loss / len(self.train_loader):.4f}")
 
+        print('Overview trained model:',self.model)
+        total_params = sum(p.numel() for p in self.model.parameters())
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        print(f'Total parameters: {total_params}')
+        print(f'Trainable parameters: {trainable_params}')
+
     def evaluate(self):
         """
         Evaluates the model using the testing dataset.
@@ -160,4 +159,91 @@ class TrainingPipeline:
                 outputs = outputs.view(-1)
                 loss = self.criterion(outputs, targets)
                 test_loss += loss.item()
-        print(f"Test Loss: {test_loss / len(self.test_loader):.4f}")
+        avg_test_loss = test_loss / len(self.test_loader)
+        print(f"Test Loss: {avg_test_loss:.4f}")
+        return avg_test_loss
+    
+    def save_model(self, file_path):
+        """
+        Saves the trained model to the specified file path.
+
+        Args:
+            file_path (str): The path where the model will be saved.
+        """
+        torch.save(self.model.state_dict(), file_path)
+        print(f"Model saved to {file_path}")
+
+def objective(trial, train_loader, test_loader):
+    """
+    Defines the objective function for hyperparameter optimization using Optuna.
+
+    Args:
+        trial (optuna.trial): An Optuna trial object that helps in suggesting hyperparameters.
+        train_loader (DataLoader): DataLoader for the training dataset.
+        test_loader (DataLoader): DataLoader for the testing/validation dataset.
+
+    Returns:
+        float: The test loss after training the model, which Optuna will try to minimize.
+    """
+
+    # Define the hyperparameters to optimize
+    input_size = 12
+    hidden_sizes = [
+        trial.suggest_int("hidden_size_1", 16, 128, step=16),
+        trial.suggest_int("hidden_size_2", 8, 64, step=8),
+        trial.suggest_int("hidden_size_3", 4, 32, step=4)
+    ]
+    dropout_rate = trial.suggest_float("dropout_rate", 0.1, 0.5)
+    learning_rate = trial.suggest_float("learning_rate", 1e-4, 1e-2, log=True)
+    optimizer_type = trial.suggest_categorical("optimizer", ["SGD", "Adam"])
+    batch_size = trial.suggest_categorical("batch_size", [16, 32, 64])
+
+    # Define model
+    model = RegressionNet(input_size=input_size, hidden_sizes=hidden_sizes, dropout_rate=dropout_rate)
+    pipeline = TrainingPipeline(
+        train_loader=train_loader,
+        test_loader=test_loader,
+        model = model,
+        learning_rate=learning_rate,
+        optimizer_type=optimizer_type,
+        criterion=nn.MSELoss(),
+        batch_size=batch_size,
+        num_epochs=5
+    )
+
+    # Train the model and evaluate its performance
+    pipeline.train()
+    test_loss = pipeline.evaluate()
+    
+    return test_loss 
+
+    
+def run_nn_train(train_loader, test_loader):
+    """
+        Runs the training of a regression neuronal network using optuna
+
+        Args:
+            train_loader (DataLoader): DataLoader for the training dataset.
+            test_loader (DataLoader): DataLoader for the testing/validation dataset.
+
+        """
+
+    # Create optuna study
+    study = optuna.create_study(direction='minimize')
+    study.optimize(lambda trial: objective(trial,train_loader,test_loader), n_trials=20, timeout=600)
+
+    pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
+    complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
+
+    # Optuna statistics
+    print("-----Study statistics:-----")
+    print("Number of finished trials: ", len(study.trials))
+    print(" Number of pruned trials: ", len(pruned_trials))
+    print(" Number of complete trials: ", len(complete_trials))
+
+    print("Best trial:")
+    trial = study.best_trial
+    print(" Value: ", trial.value)
+    print(" Parameter: ")
+    for key, value in trial.params.items():
+        print("    {}: {}".format(key, value))

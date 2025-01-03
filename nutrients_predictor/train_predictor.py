@@ -1,5 +1,5 @@
 import dataloader_predictor as DL
-import nn_predictor as NN_Pred
+import nn_predictor as nn_pred
 import pandas as pd
 import torch.nn as nn
 import xgboost_predictor
@@ -19,36 +19,28 @@ def main():
         'B12_normalized']
 
     # Select target nutrient 'pH_CaCl2_normalized', 'pH_H2O_normalized', 'P_normalized', 'N_normalized', 'K_normalized'
-    target = 'P_normalized'  
+    target = 'pH_CaCl2_normalized' 
+    
+    print('Used features:', feature_columns)
+    print('Selected target: ', target)
 
     dataloader_creator = DL.DataloaderCreator(file_path,target,feature_columns)
 
     if model_var == 'xgboost':
     # Call the function to train an XGBoost model
     # This function is assumed to be defined in the `xgboost_predictor` module
-        X_train, X_test, Y_train, Y_test = dataloader_creator.create_xgboost_data()
         print('-----Start model training: XGBoost-----')
+        X_train, X_test, Y_train, Y_test = dataloader_creator.create_xgboost_data()
         xgboost_predictor.run_xgboost_train(X_train, X_test, Y_train, Y_test)
+        print('-----End model training: XGBoost-----')
 
     elif model_var == 'nn':
         # Erstelle Dataloader für Training und Test
+        print('-----Start model training: Neuronal Network-----')
         train_loader, test_loader = dataloader_creator.create_dataloaders()
+        nn_pred.run_nn_train(train_loader, test_loader)
+        print('-----End model training: Neuronal Network-----')
 
-        # Initialize TrainingPipeline
-        batch_size = 5
-        pipeline = NN_Pred.TrainingPipeline(
-            train_loader=train_loader,
-            test_loader=test_loader,
-            learning_rate=0.001,
-            optimizer_type="Adam",
-            criterion=nn.MSELoss(), 
-            batch_size=batch_size,
-            num_epochs=5
-        )
-        print('-----Start model training: Neuronal network-----')
-        pipeline.train()
-        pipeline.evaluate()
-        
     elif model_var == 'rf': # Random forest
         print('-----Start model training: Random Forest-----')
 

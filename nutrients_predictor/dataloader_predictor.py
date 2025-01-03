@@ -76,6 +76,9 @@ class DataloaderCreator:
         test_size = len(dataset) - train_size
         train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
+        print(' Trainings dataset:',train_size,'samples')
+        print(' Test dataset:', test_size, 'samples')
+
         # Create DataLoader objects
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size)
         test_loader = DataLoader(test_dataset, batch_size=self.batch_size)
@@ -93,5 +96,8 @@ class DataloaderCreator:
         # Split the dataset into training and testing sets
         # 80% of data will be used for training, and 20% for testing
         X_train, X_test, Y_train, Y_test = train_test_split(features, targets, test_size=0.2, random_state=42)
+
+        print(' Trainings dataset:',len(X_train),'samples')
+        print(' Test dataset:', len(X_test), 'samples')
 
         return X_train, X_test, Y_train, Y_test
