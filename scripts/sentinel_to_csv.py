@@ -151,8 +151,16 @@ def main():
                     if args.flatten:
                         # copy pixel values from matrix to new columns
                         value = value.reshape(-1)
+                        center = int((len(value) - 1) / 2)
                         for i in range(value.shape[0]):
-                            output.at[index, f"{band}_{i+1}"] = value[i]
+                            # switch center value and first value to make sure that the center
+                            # pixel is always in the first column regardless of matrix shape
+                            if i == 0:
+                                output.at[index, f"{band}_{i+1}"] = value[center]
+                            elif i == center:
+                                output.at[index, f"{band}_{i+1}"] = value[0]
+                            else:
+                                output.at[index, f"{band}_{i+1}"] = value[i]
                     break
 
         # drop rows without any band data
