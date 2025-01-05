@@ -3,6 +3,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from warnings import simplefilter
 
 import numpy as np
 import pandas as pd
@@ -69,6 +70,9 @@ def main():
 
     sentinel_path = Path(os.environ["SENTINEL_DIR"])
 
+    # hide pandas warnings when creating columns
+    simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
+
     input = pd.read_csv(args.input, sep=",", header=0)
     mapping = pd.read_csv(args.mapping, sep=",", header=0)
 
@@ -102,15 +106,23 @@ def main():
     # create columns in output dataset
     normalize_columns = []
     for band in bands:
-        output[band] = None
         if args.flatten:
             for i in range(shape[0] * shape[1]):
-                output[f"{band}_{i+1}"] = None
                 normalize_columns.append(f"{band}_{i+1}")
         else:
             normalize_columns.append(band)
 
+    # create pixel matrix columns
+    if args.flatten:
+        output[bands] = None
+
+    # create empty columns
+    output[normalize_columns] = 0
+
     for index, row in output.iterrows():
+        if (index + 1) % 1000 == 0:
+            print(f"Processing row {index+1}...")
+
         path = (
             sentinel_path
             / row["SENTINEL_DATE"]
@@ -144,23 +156,25 @@ def main():
                         pass
 
                 if value is not None:
+                    output.at[index, band] = value
+
                     if np.any(value):
                         # drop rows where all bands are zero
                         empty = False
-                    output.at[index, band] = value
-                    if args.flatten:
-                        # copy pixel values from matrix to new columns
-                        value = value.reshape(-1)
-                        center = int((len(value) - 1) / 2)
-                        for i in range(value.shape[0]):
-                            # switch center value and first value to make sure that the center
-                            # pixel is always in the first column regardless of matrix shape
-                            if i == 0:
-                                output.at[index, f"{band}_{i+1}"] = value[center]
-                            elif i == center:
-                                output.at[index, f"{band}_{i+1}"] = value[0]
-                            else:
+                        if args.flatten:
+                            value = value.reshape(-1)  # value to 1d list
+
+                            # move the center of the matrix to the beginning
+                            # => center pixel is always the first column regardless of matrix shape
+                            center = int((len(value) - 1) / 2)
+                            center_value = value[center]
+                            value = np.delete(value, center)
+                            value = np.insert(value, 0, center_value)
+
+                            # copy pixel values from matrix to new columns
+                            for i in range(value.shape[0]):
                                 output.at[index, f"{band}_{i+1}"] = value[i]
+
                     break
 
         # drop rows without any band data
