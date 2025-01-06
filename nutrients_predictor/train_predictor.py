@@ -8,7 +8,7 @@ import xgboost_predictor
 
 def main():
     # Specify the model variant to be used: xgboost, nn, rf
-    model_var = 'rf'
+    model_var = 'nn'
 
     # Path to the dataset
     file_path = '/media/data/Datasets/Model_A_Dataset_v4_2024-12-30.csv'
