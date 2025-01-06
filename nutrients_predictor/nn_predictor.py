@@ -183,7 +183,7 @@ def objective(trial, train_loader, test_loader):
     n_layers = trial.suggest_int("n_layers", 1, 5)
     
     # Dynamic adjustment of neurons and dropout rate
-    hidden_sizes = [trial.suggest_int(f"n_units_l{i}", 16, 128) for i in range(n_layers)]
+    hidden_sizes = [trial.suggest_int(f"n_units_l{i}", 8, 128, 4) for i in range(n_layers)]
     dropout_rates = [trial.suggest_float(f"dropout_l{i}", 0.1, 0.5) for i in range(n_layers)]
     
     learning_rate = trial.suggest_float("learning_rate", 1e-4, 1e-2, log=True)
