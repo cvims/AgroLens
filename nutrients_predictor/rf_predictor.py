@@ -24,7 +24,7 @@ def objective(trial, X_train, X_test, Y_train, Y_test):
 def run_random_forest_train(X_train, X_test, Y_train, Y_test):
     
     study = optuna.create_study(direction='minimize')  # Minimize RMSE
-    study.optimize(lambda trial: objective(trial, X_train, X_test, Y_train, Y_test), n_trials=100)
+    study.optimize(lambda trial: objective(trial, X_train, X_test, Y_train, Y_test), n_trials=25)
 
     print("Beste Hyperparameter:", study.best_params)
     print("Bester MSE-Wert:", study.best_value)
