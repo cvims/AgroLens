@@ -1,6 +1,7 @@
 import dataloader_predictor as DL
 import nn_predictor as nn_pred
 import pandas as pd
+import rf_predictor as rf_pred
 import torch.nn as nn
 import xgboost_predictor
 
@@ -43,6 +44,9 @@ def main():
 
     elif model_var == 'rf': # Random forest
         print('-----Start model training: Random Forest-----')
+        X_train, X_test, Y_train, Y_test = dataloader_creator.create_xgboost_data()
+        rf_pred.run_random_forest_train(X_train, X_test, Y_train, Y_test)
+        print('-----End model training: Neuronal Network-----')
 
 if __name__ == "__main__":
     main()
