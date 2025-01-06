@@ -21,8 +21,8 @@ class RegressionNet(nn.Module):
     Methods:
         forward(x):
             Defines the forward pass through the network.
-    """
-    def __init__(self, input_size=12, hidden_sizes=[64, 32, 16], output_size=1, dropout_rate=0.3):
+    """  
+    def __init__(self, input_size=12, hidden_sizes=[64, 32, 16], output_size=1, dropout_rates=[0.3, 0.3, 0.3]):
         """
         Initializes the network with specified input, hidden, and output sizes.
 
@@ -30,33 +30,24 @@ class RegressionNet(nn.Module):
             input_size (int): Number of input features. Default is 12.
             hidden_sizes (list): Sizes of the hidden layers. Default is [64, 32, 16].
             output_size (int): Number of output features. Default is 1 (regression output).
-            dropout_rate (float): Dropout rate applied after each hidden layer. Default is 0.3.
+            dropout_rate (float): Dropout rate applied after each hidden layer. Default is [0.3, 0.3, 0.3].
         """
         super(RegressionNet, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_sizes[0])
-        self.fc2 = nn.Linear(hidden_sizes[0], hidden_sizes[1])
-        self.fc3 = nn.Linear(hidden_sizes[1], hidden_sizes[2])
-        self.output = nn.Linear(hidden_sizes[2], output_size)
-        self.dropout = nn.Dropout(dropout_rate)
+        layers = []
+        in_features = input_size
+
+        for i, (hidden_size, dropout_rate) in enumerate(zip(hidden_sizes, dropout_rates)):
+            layers.append(nn.Linear(in_features, hidden_size))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(dropout_rate))
+            in_features = hidden_size
+
+        layers.append(nn.Linear(in_features, output_size))  # Ausgabeschicht
+        self.model = nn.Sequential(*layers)
+        
 
     def forward(self, x):
-        """
-        Forward pass through the network.
-
-        Args:
-            x (torch.Tensor): Input tensor of shape (batch_size, input_size).
-
-        Returns:
-            torch.Tensor: Output tensor of shape (batch_size, output_size).
-        """
-        x = F.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = F.relu(self.fc2(x))
-        x = self.dropout(x)
-        x = F.relu(self.fc3(x))
-        x = self.dropout(x)
-        x = self.output(x)  # No activation on the output layer for regression
-        return x
+        return self.model(x)
 
 class LogCoshLoss(nn.Module):
     def __init__(self):
@@ -138,6 +129,7 @@ class TrainingPipeline:
                 optimizer.step()
                 running_loss += loss.item()
             print(f"Epoch {epoch + 1}/{self.num_epochs}, Loss: {running_loss / len(self.train_loader):.4f}")
+            self.evaluate()
 
         print('Overview trained model:',self.model)
         total_params = sum(p.numel() for p in self.model.parameters())
@@ -185,21 +177,21 @@ def objective(trial, train_loader, test_loader):
     Returns:
         float: The test loss after training the model, which Optuna will try to minimize.
     """
-
-    # Define the hyperparameters to optimize
     input_size = 12
-    hidden_sizes = [
-        trial.suggest_int("hidden_size_1", 16, 128, step=16),
-        trial.suggest_int("hidden_size_2", 8, 64, step=8),
-        trial.suggest_int("hidden_size_3", 4, 32, step=4)
-    ]
-    dropout_rate = trial.suggest_float("dropout_rate", 0.1, 0.5)
+    
+    # Dynamic amount of layer
+    n_layers = trial.suggest_int("n_layers", 1, 5)
+    
+    # Dynamic adjustment of neurons and dropout rate
+    hidden_sizes = [trial.suggest_int(f"n_units_l{i}", 16, 128) for i in range(n_layers)]
+    dropout_rates = [trial.suggest_float(f"dropout_l{i}", 0.1, 0.5) for i in range(n_layers)]
+    
     learning_rate = trial.suggest_float("learning_rate", 1e-4, 1e-2, log=True)
     optimizer_type = trial.suggest_categorical("optimizer", ["SGD", "Adam"])
     batch_size = trial.suggest_categorical("batch_size", [16, 32, 64])
 
     # Define model
-    model = RegressionNet(input_size=input_size, hidden_sizes=hidden_sizes, dropout_rate=dropout_rate)
+    model = RegressionNet(input_size=input_size, hidden_sizes=hidden_sizes, dropout_rates=dropout_rates)
     pipeline = TrainingPipeline(
         train_loader=train_loader,
         test_loader=test_loader,
@@ -237,7 +229,7 @@ def run_nn_train(train_loader, test_loader):
 
     # Optuna statistics
     print("-----Study statistics:-----")
-    print("Number of finished trials: ", len(study.trials))
+    print(" Number of finished trials: ", len(study.trials))
     print(" Number of pruned trials: ", len(pruned_trials))
     print(" Number of complete trials: ", len(complete_trials))
 
