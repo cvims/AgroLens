@@ -11,16 +11,16 @@ def main():
     model_var = 'nn'
 
     # Path to the dataset
-    file_path = '/media/data/Datasets/Model_A_Dataset_v4_2024-12-30.csv'
+    file_path = '/media/data/Datasets//Model_A_Soil+Sentinel_norm.csv'
 
     # Define the feature columns used for model training
-    feature_columns = ['B01_normalized', 'B02_normalized', 'B03_normalized',
-        'B04_normalized', 'B05_normalized', 'B06_normalized', 'B07_normalized',
-        'B08_normalized', 'B8A_normalized', 'B09_normalized', 'B11_normalized',
-        'B12_normalized']
+    feature_columns = ['norm_B01','norm_B02','norm_B03','norm_B04',
+                       'norm_B05','norm_B06','norm_B07','norm_B08',
+                       'norm_B8A','norm_B09','norm_B11','norm_B12']
+    
 
-    # Select target nutrient 'pH_CaCl2_normalized', 'pH_H2O_normalized', 'P_normalized', 'N_normalized', 'K_normalized'
-    target = 'pH_CaCl2_normalized' 
+    # Select target nutrient 'pH_CaCl2', 'pH_H2O', 'P', 'N', 'K'
+    target = 'pH_CaCl2' 
     
     print('Used features:', feature_columns)
     print('Selected target: ', target)
