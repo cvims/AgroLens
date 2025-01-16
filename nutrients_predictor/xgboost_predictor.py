@@ -4,7 +4,7 @@ import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 
 
-def objective(trial,dtrain, dtest,Y_test):
+def objective(trial,dtrain, dtest,Y_test, path_savemodel):
     param = {
         'objective': 'reg:squarederror',  # Regressionsziel
         'eval_metric': 'rmse',  # Metrik: Root Mean Squared Error (RMSE)
@@ -25,16 +25,22 @@ def objective(trial,dtrain, dtest,Y_test):
     Y_pred = model.predict(dtest)
     mse = mean_squared_error(Y_test, Y_pred)
 
+    # Save model with the best performance
+    if trial.number == 0 or mse < trial.study.best_value:
+        model.save_model(path_savemodel)
+        print("Modell with MSE saved!")
+
     return mse
 
 
-def run_xgboost_train(X_train, X_test, Y_train, Y_test):
+def run_xgboost_train(X_train, X_test, Y_train, Y_test, path_savemodel):
 
     dtrain = xgb.DMatrix(X_train,label=Y_train)
     dtest = xgb.DMatrix(X_test,label=Y_test)
     
     study = optuna.create_study(direction='minimize')  #Minimize RMSE
-    study.optimize(lambda trial: objective(trial, dtrain, dtest, Y_test), n_trials=100)
+    study.optimize(lambda trial: objective(trial, dtrain, dtest, Y_test, path_savemodel), n_trials=10)
 
-    print("Beste Hyperparameter:", study.best_params)
-    print("Bester MSE-Wert:", study.best_value)
+    print("Best hyperparameters of the trial", study.best_params)
+    print("MSE error of the best model:", study.best_value)
+    

@@ -8,7 +8,8 @@ import xgboost_predictor
 
 def main():
     # Specify the model variant to be used: xgboost, nn, rf
-    model_var = 'nn'
+    model_var = 'xgboost'
+    model_config = 'Model_A'   # Select model (Differs in the used inputs)
 
     # Path to the dataset
     file_path = '/media/data/Datasets/Model_A_Soil+Sentinel_norm.csv'
@@ -17,11 +18,11 @@ def main():
     feature_columns = ['norm_B01','norm_B02','norm_B03','norm_B04',
                        'norm_B05','norm_B06','norm_B07','norm_B08',
                        'norm_B8A','norm_B09','norm_B11','norm_B12']
-    
 
     # Select target nutrient 'pH_CaCl2', 'pH_H2O', 'P', 'N', 'K'
     target = 'pH_CaCl2' 
-    
+    path_savemodel = f"/media/data/Models/{model_config}/{model_var}/{model_config}_{model_var}_{target}.json"
+
     print('Used features:', feature_columns)
     print('Selected target: ', target)
 
@@ -32,7 +33,7 @@ def main():
     # This function is assumed to be defined in the `xgboost_predictor` module
         print('-----Start model training: XGBoost-----')
         X_train, X_test, Y_train, Y_test = dataloader_creator.create_xgboost_data()
-        xgboost_predictor.run_xgboost_train(X_train, X_test, Y_train, Y_test)
+        xgboost_predictor.run_xgboost_train(X_train, X_test, Y_train, Y_test, path_savemodel)
         print('-----End model training: XGBoost-----')
 
     elif model_var == 'nn':
