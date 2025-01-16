@@ -5,50 +5,65 @@ from sklearn.metrics import mean_squared_error
 
 
 def main():
-    # Get input
-    feature_columns = ['norm_B01','norm_B02','norm_B03','norm_B04',
-                            'norm_B05','norm_B06','norm_B07','norm_B08',
-                            'norm_B8A','norm_B09','norm_B11','norm_B12']
+    # Specify the model variant to be used: xgboost, nn, rf
+    model_var = 'xgboost'
+    model_config = 'Model_A'   # Select model (Differs in the used feature columns)
 
-    # Load model
-    model = xgb.Booster()
-    model.load_model('/home/ubuntu/Data/Models/Model_A/xgboost_2025-01-16/Model_A_xgboost_N.json')
+    # Select target nutrient 'pH_CaCl2', 'pH_H2O', 'P', 'N', 'K'
+    target = 'pH_H2O'
+    path_loadmodel = f"/media/data/Models/{model_config}/{model_var}/{model_config}_{model_var}_{target}.json"
 
-    # Path to dataset
+    # Feature columns
+    if model_config == 'Model_A':
+        feature_columns = ['norm_B01','norm_B02','norm_B03','norm_B04',
+                        'norm_B05','norm_B06','norm_B07','norm_B08',
+                        'norm_B8A','norm_B09','norm_B11','norm_B12']
+    elif model_config == 'Model_A+':
+        feature_columns = [] #tbd
+
+    # Input data for predicition
     file_path = '/media/data/Datasets/Model_A_Soil+Sentinel_norm.csv'
 
     # Read CSV
     data = pd.read_csv(file_path)
-
-    # Definiere die Eingabespalten und die Zielspalte (tatsächliche Werte)
-    feature_columns = ['norm_B01','norm_B02','norm_B03','norm_B04',
-                            'norm_B05','norm_B06','norm_B07','norm_B08',
-                            'norm_B8A','norm_B09','norm_B11','norm_B12']
-    # Select target nutrient 'pH_CaCl2', 'pH_H2O', 'P', 'N', 'K'
-    target = 'K'
-
-    # Wählen Sie die relevanten Spalten für den Input aus
     input_data = data[feature_columns]
-    dinput_data = xgb.DMatrix(input_data)
     target_data = data[target]
 
-    # Vorhersagen für den gesamten Datensatz machen
-    predictions = model.predict(dinput_data)
+    print(f'-----Prediction of {target} with {model_config} {model_var}-----')
+    if model_var == 'xgboost':
+        # Load xgboost and make prediciton
+        model = xgb.Booster()
+        model.load_model(path_loadmodel)
 
-    # RMSE-Fehler berechnen
-    mse_error = mean_squared_error(target_data, predictions)
-    rmse_error = np.sqrt(mse_error)
+        # Datatype change
+        dinput_data = xgb.DMatrix(input_data)
+
+        # Vorhersagen für den gesamten Datensatz machen
+        predictions = model.predict(dinput_data)
+
+        # RMSE-Fehler berechnen
+        mse_error = mean_squared_error(target_data, predictions)
+        rmse_error = np.sqrt(mse_error)
+
+    elif model_var == 'nn':
+        print()
+
+    elif model_var == 'rf':
+        print()
+
+
+
 
     # Vorhersagen und Fehler zum DataFrame hinzufügen
     data['prediction'] = predictions
-    data['error'] = (data['prediction'] - data[target]) ** 2  # Fehler (quadratische Abweichung)
+    data['RMSE'] = (data['prediction'] - data[target]) ** 2  # Fehler (quadratische Abweichung)
 
     # Ergebnisse anzeigen
     print(f"Root Mean Squared Error (RMSE): {rmse_error:.4f}")
     print(data[['norm_B01', 'norm_B02', 'norm_B03', 'norm_B04', 
                 'norm_B05', 'norm_B06', 'norm_B07', 'norm_B08', 
                 'norm_B8A', 'norm_B09', 'norm_B11', 'norm_B12', 
-                'prediction', 'error']])
+                'prediction', 'RMSE']])
     
 if __name__ == "__main__":
     main()
