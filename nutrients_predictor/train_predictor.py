@@ -15,16 +15,16 @@ def main():
     file_path = '/media/data/Datasets/Model_A_Soil+Sentinel_norm.csv'
 
     # Define the feature columns used for model training
-    feature_columns = ['norm_B01','norm_B02','norm_B03','norm_B04',
-                       'norm_B05','norm_B06','norm_B07','norm_B08',
-                       'norm_B8A','norm_B09','norm_B11','norm_B12']
+    if model_config == 'Model_A':
+        feature_columns = ['norm_B01','norm_B02','norm_B03','norm_B04',
+                        'norm_B05','norm_B06','norm_B07','norm_B08',
+                        'norm_B8A','norm_B09','norm_B11','norm_B12']
+    elif model_config == 'Model_A+':
+        feature_columns = [] #tbd
 
     # Select target nutrient 'pH_CaCl2', 'pH_H2O', 'P', 'N', 'K'
-    target = 'pH_CaCl2' 
+    target = 'K'
     path_savemodel = f"/media/data/Models/{model_config}/{model_var}/{model_config}_{model_var}_{target}.json"
-
-    print('Used features:', feature_columns)
-    print('Selected target: ', target)
 
     dataloader_creator = DL.DataloaderCreator(file_path,target,feature_columns)
 
@@ -48,6 +48,9 @@ def main():
         X_train, X_test, Y_train, Y_test = dataloader_creator.create_xgboost_data()
         rf_pred.run_random_forest_train(X_train, X_test, Y_train, Y_test)
         print('-----End model training: Neuronal Network-----')
+
+    print('Used features:', feature_columns)
+    print('Selected target: ', target)
 
 if __name__ == "__main__":
     main()
