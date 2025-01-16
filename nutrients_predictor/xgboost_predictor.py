@@ -31,7 +31,7 @@ def objective(trial,dtrain, dtest,Y_test, path_savemodel):
     # Save model with the best performance
     if trial.number == 0 or mse < trial.study.best_value:
         model.save_model(path_savemodel)
-        print(f'Model with RMSE {rmse} saved!')
+        print(f'Model with RMSE {rmse} saved.')
 
     return mse
 

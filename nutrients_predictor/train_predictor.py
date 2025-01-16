@@ -9,10 +9,7 @@ import xgboost_predictor
 def main():
     # Specify the model variant to be used: xgboost, nn, rf
     model_var = 'xgboost'
-    model_config = 'Model_A'   # Select model (Differs in the used inputs)
-
-    # Path to the dataset
-    file_path = '/media/data/Datasets/Model_A_Soil+Sentinel_norm.csv'
+    model_config = 'Model_A'   # Select model (Differs in the used feature columns)
 
     # Define the feature columns used for model training
     if model_config == 'Model_A':
@@ -25,6 +22,9 @@ def main():
     # Select target nutrient 'pH_CaCl2', 'pH_H2O', 'P', 'N', 'K'
     target = 'K'
     path_savemodel = f"/media/data/Models/{model_config}/{model_var}/{model_config}_{model_var}_{target}.json"
+
+    # Path to the dataset
+    file_path = '/media/data/Datasets/Model_A_Soil+Sentinel_norm.csv'
 
     dataloader_creator = DL.DataloaderCreator(file_path,target,feature_columns)
 
