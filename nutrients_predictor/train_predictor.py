@@ -11,7 +11,7 @@ def main():
     model_var = 'nn'
 
     # Path to the dataset
-    file_path = '/media/data/Datasets//Model_A_Soil+Sentinel_norm.csv'
+    file_path = '/media/data/Datasets/Model_A_Soil+Sentinel_norm.csv'
 
     # Define the feature columns used for model training
     feature_columns = ['norm_B01','norm_B02','norm_B03','norm_B04',
