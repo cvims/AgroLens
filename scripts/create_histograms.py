@@ -6,8 +6,8 @@ import pandas as pd
 
 def main():
     # ----- CONFIGURATION -----
-    input_csv = '/media/data/Datasets/Model_A+_Soil+Sentinel_v4_with_weather+yield.csv'  # CSV file to read from
-    histogram_folder = '/media/data/Datasets/Histograms'
+    input_csv = '/media/data/Datasets/Model_A+.csv'  # CSV file to read from
+    histogram_folder = '/media/data/Datasets/Histograms_A+'
     
     # Create the histogram folder if it doesn't already exist
     if not os.path.exists(histogram_folder):
