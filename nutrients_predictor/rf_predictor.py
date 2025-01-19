@@ -2,6 +2,7 @@ import optuna
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
+import joblib
 
 
 def objective(trial, X_train, X_test, Y_train, Y_test, save_path=None):
@@ -21,7 +22,6 @@ def objective(trial, X_train, X_test, Y_train, Y_test, save_path=None):
     
     # Save model with the best performance
     if save_path and (trial.number == 0 or mse < trial.study.best_value):
-        import joblib
         joblib.dump(model, save_path)
         print(f"Model with MSE {mse:.4f} saved to {save_path}.")
 
