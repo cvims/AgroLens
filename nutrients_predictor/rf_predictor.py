@@ -2,9 +2,10 @@ import optuna
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
+import joblib
 
 
-def objective(trial, X_train, X_test, Y_train, Y_test):
+def objective(trial, X_train, X_test, Y_train, Y_test, save_path=None):
     param = {
         'n_estimators': trial.suggest_int('n_estimators', 50, 500),  # Amount of the trees
         'max_depth': trial.suggest_int('max_depth', 3, 30),  # Maximum tree depth
@@ -18,13 +19,18 @@ def objective(trial, X_train, X_test, Y_train, Y_test):
 
     Y_pred = model.predict(X_test)
     mse = mean_squared_error(Y_test, Y_pred)
+    
+    # Save model with the best performance
+    if save_path and (trial.number == 0 or mse < trial.study.best_value):
+        joblib.dump(model, save_path)
+        print(f"Model with MSE {mse:.4f} saved to {save_path}.")
 
     return mse
 
-def run_random_forest_train(X_train, X_test, Y_train, Y_test):
+def run_random_forest_train(X_train, X_test, Y_train, Y_test, path_savemodel):
     
     study = optuna.create_study(direction='minimize')  # Minimize RMSE
-    study.optimize(lambda trial: objective(trial, X_train, X_test, Y_train, Y_test), n_trials=25)
+    study.optimize(lambda trial: objective(trial, X_train, X_test, Y_train, Y_test, path_savemodel), n_trials=25)
 
     print("Beste Hyperparameter:", study.best_params)
     print("Bester MSE-Wert:", study.best_value)

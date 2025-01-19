@@ -129,7 +129,6 @@ class TrainingPipeline:
                 optimizer.step()
                 running_loss += loss.item()
             print(f"Epoch {epoch + 1}/{self.num_epochs}, Loss: {running_loss / len(self.train_loader):.4f}")
-            self.evaluate()
 
         print('Overview trained model:',self.model)
         total_params = sum(p.numel() for p in self.model.parameters())
@@ -165,7 +164,7 @@ class TrainingPipeline:
         torch.save(self.model.state_dict(), file_path)
         print(f"Model saved to {file_path}")
 
-def objective(trial, train_loader, test_loader):
+def objective(trial, train_loader, test_loader, path_savemodel):
     """
     Defines the objective function for hyperparameter optimization using Optuna.
 
@@ -192,37 +191,45 @@ def objective(trial, train_loader, test_loader):
 
     # Define model
     model = RegressionNet(input_size=input_size, hidden_sizes=hidden_sizes, dropout_rates=dropout_rates)
+
     pipeline = TrainingPipeline(
         train_loader=train_loader,
         test_loader=test_loader,
-        model = model,
+        model=model,
         learning_rate=learning_rate,
         optimizer_type=optimizer_type,
         criterion=nn.MSELoss(),
         batch_size=batch_size,
-        num_epochs=5
+        num_epochs=10
     )
 
     # Train the model and evaluate its performance
     pipeline.train()
     test_loss = pipeline.evaluate()
     
-    return test_loss 
+    
+    # Save model with the best performance
+    if trial.number == 0 or test_loss < trial.study.best_value:
+        torch.save(model.state_dict(), path_savemodel)
+        print(f'Model with Loss {test_loss} saved.')
+
+    return test_loss
 
     
-def run_nn_train(train_loader, test_loader):
+def run_nn_train(train_loader, test_loader, path_savemodel):
     """
-        Runs the training of a regression neuronal network using optuna
+        Runs the training of a regression neuronal network using Optuna and manages model files.
 
         Args:
             train_loader (DataLoader): DataLoader for the training dataset.
             test_loader (DataLoader): DataLoader for the testing/validation dataset.
+            path_savemodel (str): Path of the saved model file.
 
         """
 
     # Create optuna study
     study = optuna.create_study(direction='minimize')
-    study.optimize(lambda trial: objective(trial,train_loader,test_loader), n_trials=20, timeout=600)
+    study.optimize(lambda trial: objective(trial, train_loader, test_loader, path_savemodel), n_trials=20, timeout=600)
 
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
