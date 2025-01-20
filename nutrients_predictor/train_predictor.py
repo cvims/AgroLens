@@ -59,7 +59,7 @@ def main():
         rf_pred.run_random_forest_train(X_train, X_test, Y_train, Y_test, f'{path_savemodel}.joblib')
         print('-----End model training: Neuronal Network-----')
 
-    print('Selected target: ', target)
+    print(f'Model_config: {model_config}, Model variant: {model_var}, Selected target: ', target)
 
 if __name__ == "__main__":
     main()
