@@ -1,36 +1,46 @@
+import json
+
 import dataloader_predictor as DL
 import nn_predictor as nn_pred
-import pandas as pd
 import rf_predictor as rf_pred
-import torch.nn as nn
 import xgboost_predictor
 
 
 def main():
-    # Specify the model variant to be used: xgboost, nn, rf
-    model_var = 'xgboost'
-    model_config = 'Model_A'   # Select model (Differs in the used feature columns)
+    
+    """
+        This script trains a selected model variant based on a specified model configuration and target nutrient. 
+        It supports three model variants: XGBoost, Neural Network (NN), and Random Forest (RF). 
+
+        Key functionalities:
+        - Allows selection of a model configuration that defines the feature columns used for training.
+        - Enables training for a specific target nutrient ('pH_CaCl2', 'pH_H2O', 'P', 'N', 'K').
+
+        Usage:
+        - Modify the `model_var`, `model_config`, and `target` variables to set the desired training parameters.
+        - Ensure the dataset paths and feature columns are correctly defined for the selected model configuration.
+    """
+
+    model_var = 'xgboost'       # Specify the model variant to be used: xgboost, nn, rf
+    model_config = 'Model_A+'    # Select model Model_A or Model_A+(Differs in the used feature columns)
+    target = 'K'                # Select target nutrient 'pH_CaCl2', 'pH_H2O', 'P', 'N', 'K'
+
+    path_savemodel = f"/media/data/Models/{model_config}/{model_var}/{model_config}_{model_var}_{target}"
+    config_path = '/media/data/Datasets/Feature_Cols/model_settings.json'
+
+    with open(config_path, 'r') as file:
+        configfile = json.load(file)
+    feature_columns = configfile[model_config]['feature_columns']
 
     # Define the feature columns used for model training
     if model_config == 'Model_A':
-        feature_columns = ['norm_B01','norm_B02','norm_B03','norm_B04',
-                        'norm_B05','norm_B06','norm_B07','norm_B08',
-                        'norm_B8A','norm_B09','norm_B11','norm_B12']
+        file_path = '/media/data/Datasets/Model_A_norm.csv'
     elif model_config == 'Model_A+':
-        feature_columns = [] #tbd
-
-    # Select target nutrient 'pH_CaCl2', 'pH_H2O', 'P', 'N', 'K'
-    target = 'K'
-    path_savemodel = f"/media/data/Models/{model_config}/{model_var}/{model_config}_{model_var}_{target}"
-
-    # Path to the dataset
-    file_path = '/media/data/Datasets/Model_A_Soil+Sentinel_norm.csv'
+        file_path = '/media/data/Datasets/Model_A+_norm.csv'
 
     dataloader_creator = DL.DataloaderCreator(file_path,target,feature_columns)
 
     if model_var == 'xgboost':
-    # Call the function to train an XGBoost model
-    # This function is assumed to be defined in the `xgboost_predictor` module
         print('-----Start model training: XGBoost-----')
         X_train, X_test, Y_train, Y_test = dataloader_creator.create_xgboost_data()
         xgboost_predictor.run_xgboost_train(X_train, X_test, Y_train, Y_test, f'{path_savemodel}.json')
@@ -49,7 +59,6 @@ def main():
         rf_pred.run_random_forest_train(X_train, X_test, Y_train, Y_test, f'{path_savemodel}.joblib')
         print('-----End model training: Neuronal Network-----')
 
-    print('Used features:', feature_columns)
     print('Selected target: ', target)
 
 if __name__ == "__main__":
