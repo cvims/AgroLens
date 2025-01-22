@@ -1,14 +1,15 @@
 import pandas as pd
 import torch
+from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset, random_split
 
 
 class RegressionDataset(Dataset):
     """
-    A dataset class to load data from CSV file.
+    A dataset class (pytorch) to load data from CSV file.
     
     """
-    def __init__(self, file_path, target_column='N_normalized', transform=None):
+    def __init__(self, file_path, target_column, feature_columns, transform=None):
         """
         Initializes the dataset with data from a CSV file.
         
@@ -23,8 +24,8 @@ class RegressionDataset(Dataset):
         self.targets = self.data[target_column].values
         
         # Select features columns
-        feature_columns = feature_columns = ['B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B09', 'B11', 'B12', 'B8A']
-        self.data = self.data[feature_columns].values
+        self.feature_columns = feature_columns
+        self.data = self.data[self.feature_columns].values
         
         # Optionally apply transformations (e.g., normalization)
         self.transform = transform
@@ -39,9 +40,9 @@ class RegressionDataset(Dataset):
         return torch.tensor(features, dtype=torch.float32), torch.tensor(target, dtype=torch.float32)
 
 class DataloaderCreator:
-    def __init__(self, file_path, target_column='N_normalized', batch_size=32, train_split=0.8, transform=None):
+    def __init__(self, file_path, target_column, feature_columns, batch_size=32, train_split=0.8, transform=None):
         """
-        Initializes the DataloaderCreator class for splitting in training and test datasets.
+        Initializes the DataloaderCreator class for splitting in training and test datasets based on pytorch
 
         Args:
             file_path (str): Path to the CSV file containing data (Soil nutriens and corresponding multispectral values).
@@ -52,13 +53,13 @@ class DataloaderCreator:
         """
         self.file_path = file_path
         self.target_column = target_column
-        self.feature_columns = ['B01', 'B02', 'B03', 'B04', 'B05', 'B06','B07', 'B08', 'B09', 'B11', 'B12', 'B8A']
+        self.feature_columns = feature_columns
         self.batch_size = batch_size
         self.train_split = train_split
         self.transform = transform
         
         # Create the RegressionDataset
-        self.dataset = RegressionDataset(file_path=self.file_path, target_column=self.target_column, transform=self.transform)
+        self.dataset = RegressionDataset(self.file_path, self.target_column,self.feature_columns, transform=self.transform)
 
     def create_dataloaders(self):
         """
@@ -75,8 +76,28 @@ class DataloaderCreator:
         test_size = len(dataset) - train_size
         train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 
+        print(' Trainings dataset:',train_size,'samples')
+        print(' Test dataset:', test_size, 'samples')
+
         # Create DataLoader objects
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size)
         test_loader = DataLoader(test_dataset, batch_size=self.batch_size)
 
         return train_loader, test_loader
+    
+    def create_xgboost_data(self):
+        # Load data table
+        data = pd.read_csv(self.file_path)
+
+        # Extract the target and feature columns as seperate np arrays
+        targets = data[self.target_column].values
+        features = data[self.feature_columns].values
+
+        # Split the dataset into training and testing sets
+        # 80% of data will be used for training, and 20% for testing
+        X_train, X_test, Y_train, Y_test = train_test_split(features, targets, test_size=0.2, random_state=42)
+
+        print(' Trainings dataset:',len(X_train),'samples')
+        print(' Test dataset:', len(X_test), 'samples')
+
+        return X_train, X_test, Y_train, Y_test
