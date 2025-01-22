@@ -164,11 +164,12 @@ class TrainingPipeline:
         torch.save(self.model.state_dict(), file_path)
         print(f"Model saved to {file_path}")
 
-def objective(trial, train_loader, test_loader, path_savemodel):
+def objective(input_size, trial, train_loader, test_loader, path_savemodel):
     """
     Defines the objective function for hyperparameter optimization using Optuna.
 
     Args:
+        input_size: The amount of model input features.
         trial (optuna.trial): An Optuna trial object that helps in suggesting hyperparameters.
         train_loader (DataLoader): DataLoader for the training dataset.
         test_loader (DataLoader): DataLoader for the testing/validation dataset.
@@ -176,7 +177,6 @@ def objective(trial, train_loader, test_loader, path_savemodel):
     Returns:
         float: The test loss after training the model, which Optuna will try to minimize.
     """
-    input_size = 12
     
     # Dynamic amount of layer
     n_layers = trial.suggest_int("n_layers", 1, 5)
@@ -216,7 +216,7 @@ def objective(trial, train_loader, test_loader, path_savemodel):
     return test_loss
 
     
-def run_nn_train(train_loader, test_loader, path_savemodel):
+def run_nn_train(input_size, train_loader, test_loader, path_savemodel):
     """
         Runs the training of a regression neuronal network using Optuna and manages model files.
 
@@ -229,7 +229,7 @@ def run_nn_train(train_loader, test_loader, path_savemodel):
 
     # Create optuna study
     study = optuna.create_study(direction='minimize')
-    study.optimize(lambda trial: objective(trial, train_loader, test_loader, path_savemodel), n_trials=20, timeout=600)
+    study.optimize(lambda trial: objective(input_size, trial, train_loader, test_loader, path_savemodel), n_trials=20, timeout=600)
 
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
