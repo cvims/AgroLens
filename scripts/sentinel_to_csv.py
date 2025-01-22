@@ -52,6 +52,14 @@ def setup_parser() -> argparse.Namespace:
         nargs="?",
         default="1x1",
     )
+    parser.add_argument(
+        "--center",
+        "-c",
+        help="Move the center pixel to the first column of each band when flattening?",
+        default=False,
+        const=True,
+        nargs="?",
+    )
 
     args = parser.parse_args()
     # do not flatten a single value
@@ -164,12 +172,13 @@ def main():
                         if args.flatten:
                             value = value.reshape(-1)  # value to 1d list
 
-                            # move the center of the matrix to the beginning
-                            # => center pixel is always the first column regardless of matrix shape
-                            center = int((len(value) - 1) / 2)
-                            center_value = value[center]
-                            value = np.delete(value, center)
-                            value = np.insert(value, 0, center_value)
+                            if args.center:
+                                # move the center of the matrix to the beginning
+                                # => center pixel is always the first column regardless of matrix shape
+                                center = int((len(value) - 1) / 2)
+                                center_value = value[center]
+                                value = np.delete(value, center)
+                                value = np.insert(value, 0, center_value)
 
                             # copy pixel values from matrix to new columns
                             for i in range(value.shape[0]):
@@ -189,6 +198,7 @@ def main():
     # drop redundant second index and create new index
     output.drop(output.columns[0], axis=1, inplace=True)
     output.reset_index(drop=True, inplace=True)
+    output.index.names = ["Index"]
 
     if args.normalize:
         scaler = preprocessing.MinMaxScaler()
