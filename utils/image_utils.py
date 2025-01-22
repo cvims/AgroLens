@@ -1,4 +1,8 @@
+import math
+from typing import Tuple
+
 import cv2
+import numpy as np
 from osgeo import gdal, osr
 
 
@@ -64,6 +68,7 @@ class ImageUtils:
         """
         Crops the image to a given radius around a center point (in pixels).
         The given point is in the exact center of the cropped image.
+        If the given point is too close to the image border, the missing pixels are filled black.
 
         Parameters:
             source (str): Path of the source image
@@ -73,7 +78,36 @@ class ImageUtils:
             radius (int): Radius (determines the image size -> 2 x radius + 1)
         """
         img = cv2.imread(source)
-        cropped = img[y - radius : y + radius + 1, x - radius : x + radius + 1]
+        size = 2 * radius + 1
+        height, width = img.shape[:2]
+
+        # fill result matrix with black
+        cropped = np.zeros((size, size, img.shape[2]), dtype=np.uint8)
+
+        # get corner coordinates of the cropping region
+        x_start, x_end = x - radius, x + radius + 1
+        y_start, y_end = y - radius, y + radius + 1
+
+        # make sure the cropping corners are not outside of the image
+        crop_x_start = max(0, x_start)
+        crop_x_end = min(width, x_end)
+        crop_y_start = max(0, y_start)
+        crop_y_end = min(height, y_end)
+
+        # crop pixels out of the original image
+        crop = img[crop_y_start:crop_y_end, crop_x_start:crop_x_end]
+
+        # move the cropping coordinates to the right place of the result matrix
+        # this makes sure the center pixel is always in the center
+        x_start = max(0, -x_start)
+        y_start = max(0, -y_start)
+
+        # copy the cropped pixels to the right place in the result matrix
+        cropped[
+            y_start : y_start + crop.shape[0],
+            x_start : x_start + crop.shape[1],
+        ] = crop
+
         cv2.imwrite(target, cropped)
 
     @classmethod
@@ -115,7 +149,9 @@ class ImageUtils:
         cv2.imwrite(target, merged)
 
     @staticmethod
-    def get_pixel_value(image: str, x: int, y: int) -> int:
+    def get_pixel_value(
+        image: str, x: int, y: int, shape: Tuple[int, int] = (1, 1)
+    ) -> int | list:
         """
         Returns the value of the given pixel of a grayscale image.
 
@@ -123,9 +159,25 @@ class ImageUtils:
             image (str): Path of the image
             x (int): Pixel x-coordinate
             y (int): Pixel y-coordinate
+            shape ((int, int), optional): Shape of the resulting matrix (default: single value)
 
         Returns:
-            int: Grayscale integer value of the pixel
+            int | list: Grayscale integer value of a single pixel or a value matrix (depends on shape)
         """
         img = cv2.imread(image, 0)
-        return img[y, x]
+
+        if not shape or shape == (1, 1):
+            # return single pixel value
+            return img[y, x]
+
+        # cut pixels in the right shape (ceil and floor to allow even shapes, e.g. 2x2)
+        radius = [
+            math.floor((shape[0] - 1) / 2),
+            math.ceil((shape[0] - 1) / 2),
+            math.floor((shape[1] - 1) / 2),
+            math.ceil((shape[1] - 1) / 2),
+        ]
+        return img[
+            y - radius[2] : y + radius[3] + 1,
+            x - radius[0] : x + radius[1] + 1,
+        ]
