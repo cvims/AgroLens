@@ -21,7 +21,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Function to load the data and compute correlation matrix
+
 def compute_and_plot_correlation(csv_file,substring='',exclude=False):
     # Read the CSV file using pandas
     data = pd.read_csv(csv_file)
@@ -34,16 +34,17 @@ def compute_and_plot_correlation(csv_file,substring='',exclude=False):
         filtered_columns = [col for col in data.columns if substring not in col]
         filtered_data = data[filtered_columns]
     
-    # Calculate the correlation matrix using numpy.corrcoef
-    # Ensure that we only use numeric columns for correlation computation
+  
     numeric_data = filtered_data.select_dtypes(include=[np.number])
-    corr_matrix = np.corrcoef(numeric_data.T)  # Transpose to get correct dimensions for correlation
+    corr_matrix = np.corrcoef(numeric_data.T)  
 
-    # Plot the correlation matrix using seaborn heatmap
+    
     plt.ion()
     plt.figure(figsize=(10, 8))
     sns.heatmap(corr_matrix, annot=False, cmap='coolwarm', xticklabels=numeric_data.columns, yticklabels=numeric_data.columns)
-    plt.title('Correlation Matrix')
+    plt.title('Correlation Matrix', fontsize=20)
+    plt.xticks(fontsize=16)
+    plt.yticks(fontsize=16)
     plt.tight_layout()
     plt.show()
 
@@ -70,3 +71,4 @@ compute_and_plot_correlation(csv_file)
 
 #uncomment if you dont want to save the figure
 plt.savefig('Dataset-A_all_Correlation-Plot.eps', format='eps')
+#plt.savefig('Dataset-A_all_Correlation-Plot.eps', format='png')
