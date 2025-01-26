@@ -49,14 +49,6 @@ class RegressionNet(nn.Module):
     def forward(self, x):
         return self.model(x)
 
-class LogCoshLoss(nn.Module):
-    def __init__(self):
-        super(LogCoshLoss, self).__init__()
-    
-    def forward(self, y_pred, y_true):
-        diff = y_pred - y_true
-        return torch.mean(torch.log(torch.cosh(diff)))
-
 class TrainingPipeline:
     """
     A training and evaluation pipeline for neural network models.
@@ -163,13 +155,59 @@ class TrainingPipeline:
     
     def save_model(self, file_path):
         """
-        Saves the trained model to the specified file path.
+        Saves the trained model to the specified file path, along with its architecture and metadata.
 
         Args:
             file_path (str): The path where the model will be saved.
         """
-        torch.save(self.model.state_dict(), file_path)
+        if isinstance(self.criterion, nn.MSELoss):
+            save_loss = 'MSE'
+        elif isinstance(self.criterion, nn.L1Loss):
+            save_loss = 'MAE'
+        elif isinstance(self.criterion, nn.SmoothL1Loss):
+            save_loss = 'Huber'
+        else:
+            save_loss = 'Unknown'
+
+        model_info = {
+            "input_size": self.model.model[0].in_features,
+            "hidden_sizes": [layer.out_features for layer in self.model.model if isinstance(layer, nn.Linear)][:-1],
+            "output_size": self.model.model[-1].out_features,
+            "dropout_rates": [layer.p for layer in self.model.model if isinstance(layer, nn.Dropout)],
+            "loss_function": save_loss
+        }
+
+        torch.save({
+            "model_info": model_info,
+            "state_dict": self.model.state_dict()
+        }, file_path)
         print(f"Model saved to {file_path}")
+
+    @staticmethod
+    def load_model(file_path):
+        """
+        Loads a model and its architecture from the specified file path.
+
+        Args:
+            file_path (str): The path to the saved model file.
+
+        Returns:
+            nn.Module: The reconstructed model.
+        """
+        checkpoint = torch.load(file_path)
+        model_info = checkpoint["model_info"]
+
+        model = RegressionNet(
+            input_size=model_info["input_size"],
+            hidden_sizes=model_info["hidden_sizes"],
+            output_size=model_info["output_size"],
+            dropout_rates=model_info["dropout_rates"]
+        )
+        model.load_state_dict(checkpoint["state_dict"])
+        model.eval()
+
+        print(f"Model loaded with architecture: {model_info}")
+        return model
 
 def objective(input_size, trial, train_loader, test_loader, path_savemodel):
     """
@@ -217,7 +255,7 @@ def objective(input_size, trial, train_loader, test_loader, path_savemodel):
     
     # Save model with the best performance
     if trial.number == 0 or test_loss < trial.study.best_value:
-        torch.save(model.state_dict(), path_savemodel)
+        pipeline.save_model(path_savemodel)
         print(f'Model with Loss {test_loss} saved.')
 
     return test_loss
