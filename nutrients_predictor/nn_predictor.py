@@ -212,7 +212,7 @@ def objective(input_size, trial, train_loader, test_loader, path_savemodel):
     
     # Save model with the best performance
     if trial.number == 0 or test_loss < trial.study.best_value:
-        torch.save(model.state_dict(), path_savemodel)
+        pipeline.save_model(path_savemodel)
         print(f'Model with Loss {test_loss} saved.')
 
     return test_loss
