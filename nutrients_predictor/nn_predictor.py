@@ -104,9 +104,9 @@ class TrainingPipeline:
 
     def _get_optimizer(self):
         if self.optimizer_type == "SGD":
-            return optim.SGD(self.model.parameters(), lr=self.learning_rate)
+            return optim.SGD(self.model.parameters(), lr=self.learning_rate, weight_decay=0.01)
         elif self.optimizer_type == "Adam":
-            return optim.Adam(self.model.parameters(), lr=self.learning_rate)
+            return optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=0.01)
         else:
             raise ValueError(f"Unsupported optimizer type: {self.optimizer_type}")
 
@@ -124,11 +124,15 @@ class TrainingPipeline:
                 optimizer.zero_grad()
                 outputs = self.model(inputs)
                 outputs = outputs.view(-1)
-                loss = self.criterion(outputs, targets)
+                if isinstance(self.criterion, nn.MSELoss):
+                    loss = torch.sqrt(self.criterion(outputs, targets))
+                else:
+                    loss = self.criterion(outputs, targets)
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.item()
             print(f"Epoch {epoch + 1}/{self.num_epochs}, Loss: {running_loss / len(self.train_loader):.4f}")
+            self.evaluate()
 
         print('Overview trained model:',self.model)
         total_params = sum(p.numel() for p in self.model.parameters())
@@ -148,7 +152,10 @@ class TrainingPipeline:
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 outputs = self.model(inputs)
                 outputs = outputs.view(-1)
-                loss = self.criterion(outputs, targets)
+                if isinstance(self.criterion, nn.MSELoss):
+                    loss = torch.sqrt(self.criterion(outputs, targets))
+                else:
+                    loss = self.criterion(outputs, targets)
                 test_loss += loss.item()
         avg_test_loss = test_loss / len(self.test_loader)
         print(f"Test Loss: {avg_test_loss:.4f}")
@@ -179,7 +186,7 @@ def objective(input_size, trial, train_loader, test_loader, path_savemodel):
     """
     
     # Dynamic amount of layer
-    n_layers = trial.suggest_int("n_layers", 1, 5)
+    n_layers = trial.suggest_int("n_layers", 3, 9)
     
     # Dynamic adjustment of neurons and dropout rate
     hidden_sizes = [trial.suggest_int(f"n_units_l{i}", 8, 128, 4) for i in range(n_layers)]
@@ -200,7 +207,7 @@ def objective(input_size, trial, train_loader, test_loader, path_savemodel):
         optimizer_type=optimizer_type,
         criterion=nn.MSELoss(),
         batch_size=batch_size,
-        num_epochs=10
+        num_epochs=20
     )
 
     # Train the model and evaluate its performance
