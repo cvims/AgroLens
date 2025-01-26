@@ -49,14 +49,6 @@ class RegressionNet(nn.Module):
     def forward(self, x):
         return self.model(x)
 
-class LogCoshLoss(nn.Module):
-    def __init__(self):
-        super(LogCoshLoss, self).__init__()
-    
-    def forward(self, y_pred, y_true):
-        diff = y_pred - y_true
-        return torch.mean(torch.log(torch.cosh(diff)))
-
 class TrainingPipeline:
     """
     A training and evaluation pipeline for neural network models.
