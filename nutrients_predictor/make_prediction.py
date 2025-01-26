@@ -44,17 +44,23 @@ def main():
         predictions = model.predict(dinput_data)
 
     elif model_var == 'nn':
-        # Load Neural Network model
-        model = torch.load(f'{path_loadmodel}.pth')
+        # Load Neural Network model with dynamic architecture
+        checkpoint = torch.load(f'{path_loadmodel}.pth')
+        model_info = checkpoint["model_info"]
+
+        # Reconstruct the model
+        model = RegressionNet(
+            input_size=model_info["input_size"],
+            hidden_sizes=model_info["hidden_sizes"],
+            output_size=model_info["output_size"],
+            dropout_rates=model_info["dropout_rates"]
+        )
+        model.load_state_dict(checkpoint["state_dict"])
         model.eval()
-        
-        # Check if loss function is stored in the model
-        if hasattr(model, 'loss_function'):
-            loss_function = model.loss_function
-            print(f"Loss Function used for training: {loss_function}")
-        else:
-            print("No loss function information stored in the model. Defaulting to MSE.")
-            loss_function = 'MSE'
+
+        # Extract loss function from model metadata
+        loss_function = model_info.get("loss_function", "MSE")
+        print(f"Loss Function used for training: {loss_function}")
 
         # Convert input data to tensor
         input_tensor = torch.tensor(input_data, dtype=torch.float32)
