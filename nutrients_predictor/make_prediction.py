@@ -24,7 +24,7 @@ def main():
         feature_columns = [] #tbd
 
     # Input data for predicition
-    file_path = '/media/data/Datasets/Model_A_Soil+Sentinel_norm.csv'   # Update needed!
+    file_path = '/media/data/Datasets/Model_A_norm.csv'
 
     # Input data for prediction
     data = pd.read_csv(file_path)
