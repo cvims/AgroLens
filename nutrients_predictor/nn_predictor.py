@@ -148,7 +148,7 @@ class TrainingPipeline:
     
     def save_model(self, file_path):
         """
-        Saves the trained model to the specified file path. As well as the loss function as meta data.
+        Saves the trained model to the specified file path, along with its architecture and metadata.
 
         Args:
             file_path (str): The path where the model will be saved.
@@ -161,9 +161,19 @@ class TrainingPipeline:
             save_loss = 'Huber'
         else:
             save_loss = 'Unknown'
-        
-        self.model.loss_function = save_loss
-        torch.save(self.model.state_dict(), file_path)
+
+        model_info = {
+            "input_size": self.model.model[0].in_features,
+            "hidden_sizes": [layer.out_features for layer in self.model.model if isinstance(layer, nn.Linear)][:-1],
+            "output_size": self.model.model[-1].out_features,
+            "dropout_rates": [layer.p for layer in self.model.model if isinstance(layer, nn.Dropout)],
+            "loss_function": save_loss
+        }
+
+        torch.save({
+            "model_info": model_info,
+            "state_dict": self.model.state_dict()
+        }, file_path)
         print(f"Model saved to {file_path}")
 
     @staticmethod
