@@ -44,27 +44,41 @@ def main():
         predictions = model.predict(dinput_data)
 
     elif model_var == 'nn':
-        # Load Neural Network model with dynamic architecture
-        checkpoint = torch.load(f'{path_loadmodel}.pth')
-        model_info = checkpoint["model_info"]
-
-        # Reconstruct the model
-        model = RegressionNet(
-            input_size=model_info["input_size"],
-            hidden_sizes=model_info["hidden_sizes"],
-            output_size=model_info["output_size"],
-            dropout_rates=model_info["dropout_rates"]
-        )
-        model.load_state_dict(checkpoint["state_dict"])
-        model.eval()
-
-        # Extract loss function from model metadata
-        loss_function = model_info.get("loss_function", "MSE")
-        print(f"Loss Function used for training: {loss_function}")
-
-        # Convert input data to tensor
-        input_tensor = torch.tensor(input_data, dtype=torch.float32)
-
+        try:
+            # Load Neural Network model with dynamic architecture
+            checkpoint = torch.load(f'{path_loadmodel}.pth')
+            
+            if "model_info" in checkpoint:
+                model_info = checkpoint["model_info"]
+    
+                # Reconstruct the model
+                model = RegressionNet(
+                    input_size=model_info["input_size"],
+                    hidden_sizes=model_info["hidden_sizes"],
+                    output_size=model_info["output_size"],
+                    dropout_rates=model_info["dropout_rates"]
+                )
+                model.load_state_dict(checkpoint["state_dict"])
+                model.eval()
+    
+                # Extract loss function from model metadata
+                loss_function = model_info.get("loss_function", "MSE")
+                print(f"Loss Function used for training: {loss_function}")
+            else:
+                print("Warning: No model_info found. Loading state_dict only.")
+                # Provide default architecture if model_info is not found
+                model = RegressionNet(input_size=12, hidden_sizes=[64, 32, 16], output_size=1, dropout_rates=[0.3, 0.3, 0.3])
+                model.load_state_dict(checkpoint)
+                model.eval()
+                loss_function = "MSE"  # Default to MSE
+    
+        except KeyError as e:
+            print(f"Error loading model: {e}")
+            raise
+    
+        # Convert input data (DataFrame) to a NumPy array, then to a tensor
+        input_tensor = torch.tensor(input_data.values, dtype=torch.float32)
+    
         # Neural Network predictions
         with torch.no_grad():
             predictions = model(input_tensor).numpy()
