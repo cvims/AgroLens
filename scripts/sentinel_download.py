@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.sentinel_api import SentinelApi
+from utils.copernicus_api import CopernicusApi
 
 
 class ThreadPrefixStd:
@@ -146,7 +146,7 @@ def api_thread(thread_index: int) -> None:
         print(f"Date: {date}, Lat: {latitude}, Long: {longitude}")
 
         try:
-            data = SentinelApi.get_data(date, latitude, longitude)
+            data = CopernicusApi.get_data(date, latitude, longitude)
             if not data:
                 raise ValueError("No Sentinel data found!")
 
@@ -202,7 +202,7 @@ def download_thread(thread_index: int) -> None:
             continue
 
         try:
-            SentinelApi.download_data(job["id"], job["point"], os.environ["TMP_DIR"])
+            CopernicusApi.download_data(job["id"], job["point"], os.environ["TMP_DIR"])
             crop_jobs.append(job)
         except Exception as e:
             print(e, file=sys.stderr)
@@ -233,7 +233,7 @@ def crop_thread(thread_index: int) -> None:
         )
 
         try:
-            SentinelApi.crop_images(
+            CopernicusApi.crop_images(
                 job["point"], job["lat"], job["lon"], os.environ["TMP_DIR"]
             )
             os.makedirs(Path(os.environ["SENTINEL_DIR"]) / job["date"], exist_ok=True)

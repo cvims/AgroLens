@@ -16,13 +16,13 @@ import requests
 from utils.image_utils import ImageUtils
 
 
-class SentinelApi:
+class CopernicusApi:
     """
-    Methods to query and download Sentinel 2 data
+    Methods to query and download Sentinel 2 or Landsat 8 satellite data
     """
 
     AUTH_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
-    API_URL = "https://catalogue.dataspace.copernicus.eu/resto/api/collections/Sentinel2/search.json"
+    API_URL = "https://catalogue.dataspace.copernicus.eu/resto/api/collections/#product#/search.json"
     DOWNLOAD_URL = (
         "https://zipper.dataspace.copernicus.eu/odata/v1/Products(#product_id#)/$value"
     )
@@ -44,34 +44,41 @@ class SentinelApi:
         date: str,
         latitude: float,
         longitude: float,
+        product: str = "Sentinel2",
         span: int = 14,
         filter_clouds: bool = True,
         limit: int = 1,
     ) -> list[dict]:
         """
-        Searches for Sentinel 2 datasets
+        Searches for Copernicus datasets
 
         Parameters:
             date (str): Date in YYYY-MM-DD format
             latitude (float): GPS latitude
             longitude (float): GPS longitude
+            product (str, optional): Name of the Copernicus product, defaults to 'Sentinel2'.
             span (int, optional): Maximum span of days to search in each direction (past and future), defaults to 14.
             filter_clouds (bool, optional): Should images with clouds above the GPS position be filtered?, defaults to True.
             limit (int, optional): Maximum number of returned entries, defaults to 1.
 
         Returns:
-            list[dict]: list of Sentinel 2 datasets, ordered by date difference to the search date
+            list[dict]: list of datasets, ordered by date difference to the search date
         """
-        print(f"Getting Sentinel 2 products for {date} ({latitude}, {longitude})...")
+        print(f"Getting {product} features for {date} ({latitude}, {longitude})...")
         cls.authenticate()
 
         date = datetime.fromisoformat(date)
         start = date - timedelta(days=span)
         end = date + timedelta(days=span + 1)
 
+        product_type = "S2MSI2A"
+        if product.lower().startswith("landsat"):
+            product = "LANDSAT-8-ESA"
+            product_type = "L2SP"
+
         query = (
-            f"{cls.API_URL}"
-            f"?productType=S2MSI2A"
+            f"{cls.API_URL.replace("#product#", product)}"
+            f"?productType={product_type}"
             f"&startDate={start.isoformat()}Z"
             f"&completionDate={end.isoformat()}Z"
             f"&lat={latitude}"
@@ -95,41 +102,52 @@ class SentinelApi:
             )
             return None
 
-        products = data["features"]
+        features = data["features"]
         # sort results by difference to the desired date
-        products.sort(key=lambda product: cls._productTimestampDiff(product, date))
+        features.sort(key=lambda product: cls._productTimestampDiff(product, date))
 
         if not filter_clouds:
-            return products[:limit]
+            return features[:limit]
 
         result = []
-        for product in products:
+        for feature in features:
             if len(result) >= limit:
                 break
-            if cls._cloud_covered(product, latitude, longitude):
+            if cls._cloud_covered(feature, latitude, longitude, product):
                 print(
-                    f"Product '{product["id"]}' ({product["properties"]["startDate"]}) has been cloud filtered."
+                    f"Dataset '{feature["id"]}' ({feature["properties"]["startDate"]}) has been cloud filtered."
                 )
             else:
-                result.append(product)
+                result.append(feature)
 
         return result
 
     @classmethod
-    def download_data(cls, id: str, dataset_name: str, target_path: str = None) -> None:
+    def download_data(
+        cls,
+        id: str,
+        dataset_name: str,
+        product: str = "Sentinel2",
+        target_path: str = None,
+    ) -> None:
         """
-        Downloads and extracts a full Sentinel dataset
+        Downloads and extracts a full satellite dataset
 
         Parameters:
-            id (str): ID of the dataset (from Sentinel API)
+            id (str): ID of the dataset (from Copernicus API)
             dataset_name (str): Name under which the data should be saved
-            target_path (str, optional): Target path to extract to, defaults to $SENTINEL_DIR.
+            product (str, optional): Name of the Copernicus product, defaults to 'Sentinel2'.
+            target_path (str, optional): Target path to extract to, defaults to $SENTINEL_DIR or $LANDSAT_DIR.
         """
         if target_path is None:
             target_path = os.environ.get("SENTINEL_DIR", "")
+            if product.lower().startswith("landsat"):
+                target_path = os.environ.get("LANDSAT_DIR", "")
 
         if (Path(target_path) / dataset_name).exists():
-            print(f"The sentinel dataset '{dataset_name}' has already been downloaded.")
+            print(
+                f"The satellite dataset '{dataset_name}' has already been downloaded."
+            )
             return
 
         os.makedirs(target_path, exist_ok=True)
@@ -163,7 +181,7 @@ class SentinelApi:
 
                     print("Download complete")
 
-                    cls._extract(zipfile, Path(target_path) / dataset_name)
+                    cls._extract(zipfile, Path(target_path) / dataset_name, product)
         except Exception as e:
             try:
                 shutil.rmtree(Path(target_path) / dataset_name, True)
@@ -175,7 +193,11 @@ class SentinelApi:
 
     @staticmethod
     def crop_images(
-        dataset_name: str, latitude: float, longitude: float, parent_path: str = None
+        dataset_name: str,
+        latitude: float,
+        longitude: float,
+        product: str = "Sentinel2",
+        parent_path: str = None,
     ) -> None:
         """
         Crops all satellite images in the dataset to 100px around the given location to save disk space
@@ -184,18 +206,34 @@ class SentinelApi:
             dataset_name (str): Name of the dataset folder
             latitude (float): GPS latitude
             longitude (float): GPS longitude
+            product (str, optional): Name of the Copernicus product, defaults to 'Sentinel2'.
             target_path (str, optional): Parent path of the dataset folder, defaults to $SENTINEL_DIR.
         """
-        if parent_path is None:
-            parent_path = os.environ.get("SENTINEL_DIR", "")
+        landsat = product.lower().startswith("landsat")
+
+        if landsat:
+            if parent_path is None:
+                parent_path = os.environ.get("LANDSAT_DIR", "")
+            extension = "tif"
+        else:
+            if parent_path is None:
+                parent_path = os.environ.get("SENTINEL_DIR", "")
+            extension = "jp2"
 
         path = Path(parent_path) / dataset_name / "IMG_DATA"
 
         print(f"Cropping images in '{path}'...")
 
-        for file in glob.glob("**/*.jp2", root_dir=path, recursive=True):
+        for file in glob.glob(f"**/*.{extension}", root_dir=path, recursive=True):
             file_path = str(path / file)
             ImageUtils.crop_location(file_path, file_path, latitude, longitude, 50)
+
+        if landsat:
+            path = Path(parent_path) / dataset_name / "QI_DATA"
+            print(f"Cropping images in '{path}'...")
+            for file in glob.glob(f"**/*.{extension}", root_dir=path, recursive=True):
+                file_path = str(path / file)
+                ImageUtils.crop_location(file_path, file_path, latitude, longitude, 50)
 
     @staticmethod
     def _productTimestampDiff(product: dict, date: datetime) -> int:
@@ -257,12 +295,12 @@ class SentinelApi:
             return True
         return int(os.environ["COPERNICUS_TOKEN_EXPIRES"]) > time.time()
 
-    @staticmethod
-    def _extract(source_path: Path, target_path: Path) -> None:
+    @classmethod
+    def _extract(cls, source_path: Path, target_path: Path, product: str) -> None:
         """
         Extracts the contents of the sentinel dataset zipfile, deletes unneccesary files
         and renames the image files for easier access.
-        The following directory structure is achieved:
+        The following directory structure is achieved (Sentinel):
         ├── AUX_DATA
         │   └── <...>
         ├── IMG_DATA
@@ -280,9 +318,21 @@ class SentinelApi:
         ├── MTD_MSIL2A.xml
         └── MTD_TL.xml
 
+        Directory structure for Landsat:
+        ├── IMG_DATA
+        │   ├── B1.tif
+        │   ├── B2.tif
+        │   └── <...>.tif
+        ├── QI_DATA
+        │   └── <...>
+        ├── ANG.txt
+        ├── MTL.json
+        └── <...>
+
         Parameters:
             source_path (Path): Path of the downloaded sentinel zipfile
             target_path (Path): Target folder to extract to
+            product (str): Name of the Copernicus product
         """
         print("Extracting...")
         shutil.rmtree(target_path, True)
@@ -291,17 +341,30 @@ class SentinelApi:
             zip.extractall(target_path.parent / f"{source_path.stem}_tmp")
             os.remove(source_path)
 
-        # move required files to target directory
+        # get data path
         os.mkdir(target_path)
         root = target_path.parent / f"{source_path.stem}_tmp"
         root = root / os.listdir(root)[0]
-        path = root / "GRANULE"
+
+        if product.lower().startswith("landsat"):
+            cls._restructure_landsat(target_path, root)
+        else:
+            cls._restructure_sentinel(target_path, root)
+
+        shutil.rmtree(root.parent)
+
+    @staticmethod
+    def _restructure_sentinel(target_path: Path, root_path: Path) -> None:
+        # get image directory
+        path = root_path / "GRANULE"
         path = path / os.listdir(path)[0]
+        img_path = target_path / "IMG_DATA"
+
         os.rename(path, target_path)
-        os.rename(root / "MTD_MSIL2A.xml", target_path / "MTD_MSIL2A.xml")
+        img_path = target_path / "IMG_DATA"
+        os.rename(root_path / "MTD_MSIL2A.xml", target_path / "MTD_MSIL2A.xml")
 
         # rename image files to "<band>.jp2"
-        img_path = target_path / "IMG_DATA"
         for dir in os.listdir(img_path):
             for file in os.listdir(img_path / dir):
                 band = file.split("_")[2]
@@ -315,29 +378,56 @@ class SentinelApi:
                 target_path / "QI_DATA" / "PVI.jp2",
             )
 
-        shutil.rmtree(root.parent)
+    @staticmethod
+    def _restructure_landsat(target_path: Path, root_path: Path) -> None:
+        os.rename(root_path, target_path)
+        os.mkdir(target_path / "IMG_DATA")
+        os.mkdir(target_path / "QI_DATA")
+
+        for file in os.listdir(target_path):
+            if not Path(target_path / file).is_file():
+                continue
+            name, extension = os.path.splitext(file)
+            band = name.split("_")[-1]
+            if extension.lower() != ".tif":
+                os.rename(target_path / file, target_path / f"{band}{extension}")
+            elif band[0] == "B":
+                os.rename(target_path / file, target_path / "IMG_DATA" / f"{band}.tif")
+            else:
+                os.rename(target_path / file, target_path / "QI_DATA" / f"{band}.tif")
+
+        os.remove(target_path / "small.jpeg")
+        os.rename(target_path / "large.jpeg", target_path / "thumbnail.jpg")
 
     @classmethod
-    def _cloud_covered(cls, product: dict, latitude: float, longitude: float) -> bool:
+    def _cloud_covered(
+        cls, feature: dict, latitude: float, longitude: float, product: str
+    ) -> bool:
         """
         Checks if there is a cloud on the given GPS position of the given product
         by downloading and checking the cloud mask from S3.
+        Works only for Sentinel 2 data.
 
         Parameters:
-            product (dict): Product dict from the Copernicus API
+            feature (dict): Feature dict from the Copernicus API
             latitude (float): GPS latitude
             longitude (float): GPS longitude
+            product (str): Name of the Copernicus product
 
         Returns:
             bool: Returns True if there is a cloud on the given position
         """
+        # never filter Landsat images
+        if product.lower().startswith("Landsat"):
+            return False
+
         image_file = Path(os.environ["TMP_DIR"]) / "cloud_masks" / f"{uuid.uuid4()}.jp2"
 
         try:
             if not image_file.is_file():
                 response = cls.s3.list_objects_v2(
                     Bucket="eodata",
-                    Prefix=product["properties"]["productIdentifier"].split("/", 2)[2],
+                    Prefix=feature["properties"]["productIdentifier"].split("/", 2)[2],
                 )
 
                 cloud_mask = False
@@ -366,7 +456,7 @@ class SentinelApi:
         input_file: str, x: int, y: int, radius: int = 5, threshold: int = 20
     ) -> bool:
         """
-        Checks whether the given pixel and its neighboring pixels are covered by clouds.
+        Checks whether the given pixel and its neighboring pixels are covered by clouds. (Sentinel 2 only)
 
         Parameters:
             input_file (str): Path to the input file (GeoTIFF with bands).
