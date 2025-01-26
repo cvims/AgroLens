@@ -166,6 +166,32 @@ class TrainingPipeline:
         torch.save(self.model.state_dict(), file_path)
         print(f"Model saved to {file_path}")
 
+    @staticmethod
+    def load_model(file_path):
+        """
+        Loads a model and its architecture from the specified file path.
+
+        Args:
+            file_path (str): The path to the saved model file.
+
+        Returns:
+            nn.Module: The reconstructed model.
+        """
+        checkpoint = torch.load(file_path)
+        model_info = checkpoint["model_info"]
+
+        model = RegressionNet(
+            input_size=model_info["input_size"],
+            hidden_sizes=model_info["hidden_sizes"],
+            output_size=model_info["output_size"],
+            dropout_rates=model_info["dropout_rates"]
+        )
+        model.load_state_dict(checkpoint["state_dict"])
+        model.eval()
+
+        print(f"Model loaded with architecture: {model_info}")
+        return model
+
 def objective(input_size, trial, train_loader, test_loader, path_savemodel):
     """
     Defines the objective function for hyperparameter optimization using Optuna.
