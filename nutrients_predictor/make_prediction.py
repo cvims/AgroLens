@@ -1,7 +1,9 @@
+import joblib
 import numpy as np
 import pandas as pd
+import torch
 import xgboost as xgb
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 
 def main():
@@ -41,14 +43,46 @@ def main():
         # XGBoost predicitions
         predictions = model.predict(dinput_data)
 
-        mse_error = mean_squared_error(target_data, predictions)
-        rmse_error = np.sqrt(mse_error)
-
     elif model_var == 'nn':
-        print("NN logic not implemented yet.")
+        # Load Neural Network model
+        model = torch.load(f'{path_loadmodel}.pth')
+        model.eval()
+        
+        # Check if loss function is stored in the model
+        if hasattr(model, 'loss_function'):
+            loss_function = model.loss_function
+            print(f"Loss Function used for training: {loss_function}")
+        else:
+            print("No loss function information stored in the model. Defaulting to MSE.")
+            loss_function = 'MSE'
+
+        # Convert input data to tensor
+        input_tensor = torch.tensor(input_data, dtype=torch.float32)
+
+        # Neural Network predictions
+        with torch.no_grad():
+            predictions = model(input_tensor).numpy()
 
     elif model_var == 'rf':
-        print("RF logic not implemented yet.")
+        # Load Random Forest model
+        model = joblib.load(f'{path_loadmodel}.joblib')
+
+        # Random Forest predictions
+        predictions = model.predict(input_data)
+
+    # Calculate errors based on loss function
+    if loss_function == 'MAE':
+        mae_error = mean_absolute_error(target_data, predictions)
+        print(f"Mean Absolute Error (MAE): {mae_error}")
+    elif loss_function == 'Huber':
+        # Huber Loss calculation can be complex; here, we approximate it with MAE for simplicity
+        mae_error = mean_absolute_error(target_data, predictions)  # Replace with Huber-specific logic if needed
+        print(f"Huber Loss (approximated with MAE): {mae_error}")
+    else:  # Default to MSE
+        mse_error = mean_squared_error(target_data, predictions)
+        rmse_error = np.sqrt(mse_error)
+        print(f"Mean Squared Error (MSE): {mse_error}")
+        print(f"Root Mean Squared Error (RMSE): {rmse_error}")
 
     # Add predictions and errors to DataFrame
     data['Target'] = target_data

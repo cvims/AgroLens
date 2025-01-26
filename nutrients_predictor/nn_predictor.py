@@ -156,11 +156,21 @@ class TrainingPipeline:
     
     def save_model(self, file_path):
         """
-        Saves the trained model to the specified file path.
+        Saves the trained model to the specified file path. As well as the loss function as meta data.
 
         Args:
             file_path (str): The path where the model will be saved.
         """
+        if isinstance(self.criterion, nn.MSELoss):
+            save_loss = 'MSE'
+        elif isinstance(self.criterion, nn.L1Loss):
+            save_loss = 'MAE'
+        elif isinstance(self.criterion, nn.SmoothL1Loss):
+            save_loss = 'Huber'
+        else:
+            save_loss = 'Unknown'
+        
+        self.model.loss_function = save_loss
         torch.save(self.model.state_dict(), file_path)
         print(f"Model saved to {file_path}")
 
