@@ -9,6 +9,7 @@ numpy==1.26.4
 optuna==4.1.0
 optuna-dashboard==0.17.0
 pandas==2.2.3
+plotly==5.24.1
 rasterio==1.4.2
 requests==2.32.3
 scikit-learn==1.5.2
