@@ -1,6 +1,7 @@
+import numpy as np
 import pandas as pd
 import torch
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold, train_test_split
 from torch.utils.data import DataLoader, Dataset, random_split
 
 
@@ -63,6 +64,7 @@ class DataloaderCreator:
         self.batch_size = batch_size
         self.train_split = train_split
         self.transform = transform
+        self.grid_size = 5
         
         self.dataset = RegressionDataset(self.file_path, self.target_column,self.feature_columns, transform=self.transform)
 
@@ -109,3 +111,90 @@ class DataloaderCreator:
         print(' Test dataset:', len(X_test), 'samples')
 
         return X_train, X_test, Y_train, Y_test
+
+    def _create_grid_ids(self):
+        """
+        Assigns grid IDs to each data point based on geographic coordinates (TH_LAT, TH_LONG).
+
+        Args:
+            grid_size (float): Size of each grid cell in degrees. Default is 1.0.
+        """
+
+        data = pd.read_csv(self.file_path)
+        min_long = data['TH_LONG'].min()
+        max_long = data['TH_LONG'].max()
+        min_lat = data['TH_LAT'].min()
+        max_lat = data['TH_LAT'].max()
+
+        print(f"Min Coordinates: TH_LONG = {min_long}, TH_LAT = {min_lat}")
+        print(f"Max Coordinates: TH_LONG = {max_long}, TH_LAT = {max_lat}")
+
+        data['grid_x'] = ((data['TH_LONG'] - min_long) // self.grid_size).astype(int)
+        data['grid_y'] = ((data['TH_LAT'] - min_lat) // self.grid_size).astype(int)
+        data['grid_id'] = data['grid_x'].astype(str) + "_" + data['grid_y'].astype(str)
+        self.data_with_grid = data
+
+    def create_scv_data(self, n_splits=5, validation_split = 0.1):
+        """
+            Create spatial cross-validation splits for XGBoost.
+
+            Args:
+                data_with_grid (pd.DataFrame): DataFrame containing the data with calculated grid IDs.
+                feature_columns (list): List of feature column names.
+                target_column (str): Target column name.
+                n_splits (int): Number of folds for cross-validation. Default is 5.
+                validation_split (float): Fraction of data to be used as validation set. Default is 0.1.
+                random_state (int): Random seed for reproducibility.
+
+            Returns:
+                tuple: (folds, validation_data)
+                    - folds: List of (X_train, y_train, X_test, y_test) for each fold.
+                    - validation_data: Tuple (X_val, y_val) for the validation set.
+        """
+
+        random_state = 42
+        self._create_grid_ids()
+
+        # Separate validation set based on grids
+        grid_ids = self.data_with_grid['grid_id'].unique()
+        val_size = int(len(grid_ids) * validation_split)
+        np.random.seed(random_state)
+        np.random.shuffle(grid_ids)
+
+        val_grids = grid_ids[:val_size]
+        train_grids = grid_ids[val_size:]
+
+        train_data = self.data_with_grid[self.data_with_grid['grid_id'].isin(train_grids)]
+        val_data = self.data_with_grid[self.data_with_grid['grid_id'].isin(val_grids)]
+
+        # Extract validation features and targets
+        X_val = val_data[self.feature_columns].values
+        y_val = val_data[self.target_column].values
+
+        print(f'Validation samples: {len(val_data)}')
+
+        # Create KFold splits for training data
+        train_grid_ids = train_data['grid_id'].unique()
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+        folds= []
+
+        for fold_idx, (train_idx, test_idx) in enumerate(kf.split(train_grid_ids)):
+            fold_train_grids = train_grid_ids[train_idx]
+            fold_test_grids = train_grid_ids[test_idx]
+
+            fold_train_data = train_data[train_data['grid_id'].isin(fold_train_grids)]
+            fold_test_data = train_data[train_data['grid_id'].isin(fold_test_grids)]
+
+            # Print sample counts
+            print(f"Fold {fold_idx + 1}:")
+            print(f"  Training samples: {len(fold_train_data)}")
+            print(f"  Testing samples: {len(fold_test_data)}")
+
+            X_train = fold_train_data[self.feature_columns].values
+            y_train = fold_train_data[self.target_column].values
+            X_test = fold_test_data[self.feature_columns].values
+            y_test = fold_test_data[self.target_column].values
+
+            folds.append((X_train, y_train, X_test, y_test))
+
+        return folds, (X_val, y_val)

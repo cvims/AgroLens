@@ -61,4 +61,90 @@ def run_xgboost_train(X_train, X_test, Y_train, Y_test, path_savemodel):
 
     print("Best hyperparameters of the trial", study.best_params)
     print("RMSE error of the model with the best hyperparameters:", np.sqrt(study.best_value))
+
+def objective_with_scv(trial, folds, path_savemodel):
+    """
+    This function defines the optimization objective for the Optuna study. It:
+    - Defines the hyperparameters to be tuned by Optuna.
+    - Trains the XGBoost model with the given hyperparameters.
+    - Calculates the RMSE of the model's predictions and saves the best model.
+    """
+    param = {
+        'objective': 'reg:squarederror', 
+        'eval_metric': 'rmse', 
+        'tree_method': 'hist', 
+
+        # Hyperparameters to tune:
+        'max_depth': trial.suggest_int('max_depth', 3, 12), 
+        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3), 
+        'subsample': trial.suggest_float('subsample', 0.6, 1.0),   # Column sampling per tree
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),   # Column sampling per tree
+        'gamma': trial.suggest_float('gamma', 0, 1),  # Regularization parameter
+        'reg_alpha': trial.suggest_float('reg_alpha', 0, 1),  # L1 regularization
+        'reg_lambda': trial.suggest_float('reg_lambda', 0, 1),   # L2 regularization
+    }
+
+    # Perform Cross-Validation for each fold
+    fold_rmses = []
+    
+    for fold_idx,(X_train, y_train, X_test, y_test) in enumerate(folds):
+
+        dtrain = xgb.DMatrix(X_train, label=y_train)
+        dtest = xgb.DMatrix(X_test, label=y_test)
+        
+        model = xgb.train(param, dtrain)
+
+        prediction = model.predict(dtest)
+        rmse = np.sqrt(mean_squared_error(y_test, prediction))
+        fold_rmses.append(rmse)
+        
+        # Optionally save model if it's the best for this fold
+        # if fold_idx == 0 or rmse < min(fold_rmses):
+        #     model.save_model(path_savemodel)
+        #     print(f'Model for fold {fold_idx + 1} saved with RMSE: {rmse}')
+    
+    # Return the average RMSE over all folds for this trial
+    avg_rmse = np.mean(fold_rmses)
+    print(f'Average RMSE for trial {trial.number}: {avg_rmse}')
+    return avg_rmse
+
+def run_xgboost_scv_train(folds,X_val, y_val,path_savemodel, n_trials=10):
+    
+    study = optuna.create_study(direction='minimize')
+    study.optimize(lambda trial: objective_with_scv(trial, folds, path_savemodel), n_trials=n_trials)
+    
+    print("Best hyperparameters:", study.best_params)
+    print("Average RMSE of the model with the best hyperparameters:", study.best_value)
+
+    # Trainiere das finale Modell mit den besten Hyperparametern auf dem gesamten Trainingsdatensatz
+    param = {
+        'objective': 'reg:squarederror',
+        'eval_metric': 'rmse',
+        'tree_method': 'hist',
+        'max_depth': study.best_params['max_depth'],
+        'learning_rate': study.best_params['learning_rate'],
+        'subsample': study.best_params['subsample'],
+        'colsample_bytree': study.best_params['colsample_bytree'],
+        'gamma': study.best_params['gamma'],
+        'reg_alpha': study.best_params['reg_alpha'],
+        'reg_lambda': study.best_params['reg_lambda'],
+    }
+
+    (X_train, y_train, X_test, y_test) = folds[0]
+    X_train_full = np.vstack((X_train, X_test))
+    y_train_full = np.hstack((y_train, y_test))
+    dtrain_full = xgb.DMatrix(X_train_full, label=y_train_full)
+    best_model = xgb.train(param, dtrain_full)
+    
+    # Speichern des finalen Modells
+    # best_model.save_model(path_savemodel)
+    # print(f"Final model saved to {path_savemodel}")
+
+    # Evaluation auf dem Validierungsdatensatz   
+    dval = xgb.DMatrix(X_val, label=y_val)
+    prediction = best_model.predict(dval)
+
+    val_rmse = np.sqrt(mean_squared_error(y_val,prediction))
+    print(f"Validation RMSE on unseen data: {val_rmse}")
+    
     
