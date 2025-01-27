@@ -6,19 +6,25 @@ from sklearn.metrics import mean_squared_error
 
 
 def objective(trial,dtrain, dtest,Y_test, path_savemodel):
+    """
+    This function defines the optimization objective for the Optuna study. It:
+    - Defines the hyperparameters to be tuned by Optuna.
+    - Trains the XGBoost model with the given hyperparameters.
+    - Calculates the RMSE of the model's predictions and saves the best model.
+    """
     param = {
-        'objective': 'reg:squarederror',  # Regressionsziel
-        'eval_metric': 'rmse',  # Metrik: Root Mean Squared Error (RMSE)
-        'tree_method': 'hist',  # Benutze den 'hist' Baum-Algorithmus für Geschwindigkeit
+        'objective': 'reg:squarederror', 
+        'eval_metric': 'rmse', 
+        'tree_method': 'hist', 
 
-         # Suche nach den besten Hyperparametern
-        'max_depth': trial.suggest_int('max_depth', 3, 12),  # Baumtiefe (zwischen 3 und 12)
-        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),  # Lernrate
-        'subsample': trial.suggest_float('subsample', 0.6, 1.0),  # Subsampling-Rate
-        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),  # Spalten-Sampling
-        'gamma': trial.suggest_float('gamma', 0, 1),  # Gamma (Regularisierungsterm)
-        'reg_alpha': trial.suggest_float('reg_alpha', 0, 1),  # L1 Regularisierung
-        'reg_lambda': trial.suggest_float('reg_lambda', 0, 1),  # L2 Regularisierung
+        # Hyperparameters to tune:
+        'max_depth': trial.suggest_int('max_depth', 3, 12), 
+        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3), 
+        'subsample': trial.suggest_float('subsample', 0.6, 1.0),   # Column sampling per tree
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),   # Column sampling per tree
+        'gamma': trial.suggest_float('gamma', 0, 1),  # Regularization parameter
+        'reg_alpha': trial.suggest_float('reg_alpha', 0, 1),  # L1 regularization
+        'reg_lambda': trial.suggest_float('reg_lambda', 0, 1),   # L2 regularization
     }
 
     model = xgb.train(param,dtrain)
@@ -28,16 +34,19 @@ def objective(trial,dtrain, dtest,Y_test, path_savemodel):
     rmse = np.sqrt(mse)
     print(f'RMSE of Trial {trial.number}: {rmse}')
 
-    # Save model with the best performance
     if trial.number == 0 or mse < trial.study.best_value:
         model.save_model(path_savemodel)
         print(f'Model with RMSE {rmse} saved.')
 
-    return mse
+    return rmse
 
 
 def run_xgboost_train(X_train, X_test, Y_train, Y_test, path_savemodel):
-
+    """
+        This function initiates the XGBoost training and hyperparameter optimization process:
+        - Converts the training and testing datasets into DMatrix format for XGBoost.
+        - Creates an Optuna study to minimize the RMSE by optimizing the hyperparameters.
+    """
     dtrain = xgb.DMatrix(X_train,label=Y_train)
     dtest = xgb.DMatrix(X_test,label=Y_test)
     
