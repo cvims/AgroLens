@@ -64,10 +64,17 @@ def run_xgboost_train(X_train, X_test, Y_train, Y_test, path_savemodel):
 
 def objective_with_scv(trial, folds, path_savemodel):
     """
-    This function defines the optimization objective for the Optuna study. It:
-    - Defines the hyperparameters to be tuned by Optuna.
-    - Trains the XGBoost model with the given hyperparameters.
-    - Calculates the RMSE of the model's predictions and saves the best model.
+        This function defines the optimization objective for the Optuna study. It:
+        - Defines the hyperparameters to be tuned by Optuna.
+        - Calculates the RMSE of the model's predictions and returns the average RMSE for the trial.
+
+        Args:
+            trial (optuna.Trial): The Optuna trial object, used to sample hyperparameters.
+            folds (list): A list of cross-validation folds, where each fold is a tuple (X_train, y_train, X_test, y_test).
+            path_savemodel (str): Path to save the model (optional, not used here).
+
+        Returns:
+            float: The average RMSE over all folds for this trial.
     """
     param = {
         'objective': 'reg:squarederror', 
@@ -84,7 +91,6 @@ def objective_with_scv(trial, folds, path_savemodel):
         'reg_lambda': trial.suggest_float('reg_lambda', 0, 1),   # L2 regularization
     }
 
-    # Perform Cross-Validation for each fold
     fold_rmses = []
     
     for fold_idx,(X_train, y_train, X_test, y_test) in enumerate(folds):
@@ -97,18 +103,26 @@ def objective_with_scv(trial, folds, path_savemodel):
         prediction = model.predict(dtest)
         rmse = np.sqrt(mean_squared_error(y_test, prediction))
         fold_rmses.append(rmse)
-        
-        # Optionally save model if it's the best for this fold
-        # if fold_idx == 0 or rmse < min(fold_rmses):
-        #     model.save_model(path_savemodel)
-        #     print(f'Model for fold {fold_idx + 1} saved with RMSE: {rmse}')
     
     # Return the average RMSE over all folds for this trial
     avg_rmse = np.mean(fold_rmses)
     print(f'Average RMSE for trial {trial.number}: {avg_rmse}')
     return avg_rmse
 
-def run_xgboost_scv_train(folds,X_val, y_val,path_savemodel, n_trials=10):
+def run_xgboost_scv_train(folds,X_val, y_val,path_savemodel, n_trials=50):
+    """
+        This function runs the XGBoost training with spatial cross-validation (SCV) and hyperparameter optimization.
+        - Optimizes hyperparameters using Optuna to minimize RMSE.
+        - Trains the final model with the best hyperparameters on the combined training data.
+        - Evaluates the final model on a separate validation set and prints the validation RMSE.
+
+        Args:
+            folds (list): A list of cross-validation folds, where each fold is a tuple (X_train, y_train, X_test, y_test).
+            X_val (np.ndarray): Validation features.
+            y_val (np.ndarray): Validation targets.
+            path_savemodel (str): Path to save the trained model (optional, not used here).
+            n_trials (int): Number of trials for Optuna optimization. Default is 50.
+    """
     
     study = optuna.create_study(direction='minimize')
     study.optimize(lambda trial: objective_with_scv(trial, folds, path_savemodel), n_trials=n_trials)
@@ -116,7 +130,7 @@ def run_xgboost_scv_train(folds,X_val, y_val,path_savemodel, n_trials=10):
     print("Best hyperparameters:", study.best_params)
     print("Average RMSE of the model with the best hyperparameters:", study.best_value)
 
-    # Trainiere das finale Modell mit den besten Hyperparametern auf dem gesamten Trainingsdatensatz
+    # Train the final model with the best hyperparameters on the full training dataset
     param = {
         'objective': 'reg:squarederror',
         'eval_metric': 'rmse',
@@ -136,11 +150,9 @@ def run_xgboost_scv_train(folds,X_val, y_val,path_savemodel, n_trials=10):
     dtrain_full = xgb.DMatrix(X_train_full, label=y_train_full)
     best_model = xgb.train(param, dtrain_full)
     
-    # Speichern des finalen Modells
-    # best_model.save_model(path_savemodel)
-    # print(f"Final model saved to {path_savemodel}")
+    best_model.save_model(path_savemodel)
+    print(f"Final model saved to {path_savemodel}")
 
-    # Evaluation auf dem Validierungsdatensatz   
     dval = xgb.DMatrix(X_val, label=y_val)
     prediction = best_model.predict(dval)
 
