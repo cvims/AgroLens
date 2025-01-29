@@ -62,7 +62,7 @@ def run_model(model_var, model_config, target, include_optional_data=True):
 
 def main():
     
-    model_vars = ['xgboost', 'nn', 'rf']
+    model_vars = ['rf', 'nn', 'xgboost']
     model_configs = ['Model_A', 'Model_A+']
     targets = ['pH_CaCl2', 'pH_H2O', 'P', 'N', 'K']
     
@@ -73,10 +73,11 @@ def main():
 
     for model_var in model_vars:
         # for model_config in model_configs:
-            for target in targets:
-                print('-'*30)
-                print(f'Training with Model Config: {model_config}, Model: {model_var}, Target: {target}, Optional Data: {include_optional_data}')
-                run_model(model_var, model_config, target, include_optional_data)
+        for target in targets:
+            print('-'*30)
+            print(f'Training with Model Config: {model_config}, Model: {model_var}, Target: {target}, Optional Data: {include_optional_data}')
+            run_model(model_var, model_config, target, include_optional_data)
+            print()
     print('-'*30)
     print('Done!')
 
