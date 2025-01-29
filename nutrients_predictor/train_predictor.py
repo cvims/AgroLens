@@ -6,7 +6,7 @@ import rf_predictor as rf_pred
 import xgboost_predictor
 
 
-def run_model(model_var, model_config, target, include_optional_data=True):
+def run_model(model_var, model_config, target, validation, include_optional_data=True):
     """
         This function trains the selected model (XGBoost, Neural Network, or Random Forest) based on the given 
         model configuration and target nutrient. It also manages the loading of the required datasets and 
@@ -39,10 +39,17 @@ def run_model(model_var, model_config, target, include_optional_data=True):
     dataloader_creator = DL.DataloaderCreator(file_path,target,feature_columns)
 
     if model_var == 'xgboost':
-        print('-----Start model training: XGBoost-----')
-        X_train, X_test, Y_train, Y_test = dataloader_creator.create_xgboost_data()
-        xgboost_predictor.run_xgboost_train(X_train, X_test, Y_train, Y_test, f'{path_savemodel}.json')
-        print('-----End model training: XGBoost-----')
+        if validation == 'Single':
+            print('-----Start model training: XGBoost-----')
+            X_train, X_test, Y_train, Y_test = dataloader_creator.create_xgboost_data()
+            xgboost_predictor.run_xgboost_train(X_train, X_test, Y_train, Y_test, f'{path_savemodel}.json')
+            print('-----End model training: XGBoost-----')
+
+        if validation == 'Spatial':
+            print('-----Start model training with Spatial Cross Validation: XGBoost-----')
+            folds, (X_val, y_val) = dataloader_creator.create_scv_data()
+            xgboost_predictor.run_xgboost_scv_train(folds, X_val, y_val, f'{path_savemodel}_SCV.json')
+            print('-----End model training with Spatial Cross Validation: XGBoost-----')
 
     elif model_var == 'nn':
         print('-----Start model training: Neuronal Network-----')
@@ -75,6 +82,7 @@ def main():
     model_var = 'xgboost'        # Specify the model variant to be used: xgboost, nn, rf
     target = 'pH_CaCl2'          # Select target nutrient 'pH_CaCl2', 'pH_H2O', 'P', 'N', 'K'
     include_optional_data = True # Currently comprises yield gap data which is under suspicion of considering soil nutrients therefore cheating
+    validation = 'Single'        # Select validation method 'Single' or 'Spatial' (Spatial Cross Validation is only for XGBoost available)
 
     # Loop over model variants and target nutrients
     for model_var in model_vars:
@@ -82,7 +90,7 @@ def main():
             for target in targets:
                 print('-'*30)
                 print(f'Training with Model Config: {model_config}, Model: {model_var}, Target: {target}, Optional Data: {include_optional_data}')
-                run_model(model_var, model_config, target, include_optional_data)
+                run_model(model_var, model_config, target, validation, include_optional_data)
     print('-'*30)
     print('Done!')
 
