@@ -11,8 +11,8 @@ def main():
     '''
 
     # ----- CONFIGURATION -----
-    input_csv = '/media/data/Datasets/Model_A_Soil+Sentinel.csv'
-    output_csv_normalized = '/media/data/Datasets/Model_A_Soil+Sentinel_norm.csv'
+    input_csv = '/media/data/Datasets/Model_A+.csv'
+    output_csv_normalized = '/media/data/Datasets/Model_A+_norm.csv'
 
     # Specify columns to exclude from normalization
     excluded_columns = [
