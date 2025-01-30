@@ -66,10 +66,10 @@ def main():
     model_configs = ['Model_A', 'Model_A+']
     targets = ['pH_CaCl2', 'pH_H2O', 'P', 'N', 'K']
     
-    model_config = 'Model_A+'    # Select model Model_A or Model_A+(Differs in the used feature columns)
+    model_config = 'Model_A+'    # Select model Model_A or Model_A+ (Differs in the used feature columns)
     model_var = 'xgboost'        # Specify the model variant to be used: xgboost, nn, rf
     target = 'pH_CaCl2'          # Select target nutrient 'pH_CaCl2', 'pH_H2O', 'P', 'N', 'K'
-    include_optional_data = True # Currently comprises yield gap data which is under suspicion of considering soil nutrients therefore cheating
+    include_optional_data = True # Currently comprises Clay data
 
     for model_var in model_vars:
         # for model_config in model_configs:
