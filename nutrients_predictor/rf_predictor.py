@@ -34,7 +34,7 @@ def objective(trial, X_train, X_test, Y_train, Y_test, save_path=None):
 def run_random_forest_train(X_train, X_test, Y_train, Y_test, path_savemodel):
     
     study = optuna.create_study(direction='minimize')  # Minimize RMSE
-    study.optimize(lambda trial: objective(trial, X_train, X_test, Y_train, Y_test, path_savemodel), n_trials=25)
+    study.optimize(lambda trial: objective(trial, X_train, X_test, Y_train, Y_test, path_savemodel), n_trials=10)
 
     plot_data = optuna.visualization.plot_param_importances(study, evaluator=None, params=None, target=None, target_name='Objective Value')
     fig = go.Figure(plot_data)
