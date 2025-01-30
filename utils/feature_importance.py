@@ -3,7 +3,7 @@
 Script Name: feature_importance.py
 Author: Viola Kolb
 Last Change: Marinus Luegmair
-Date: 27.01.25
+Date: 30.01.25
 Description: Short programm to read a data table, calculate the feature importance for xgboost and plot it
 
 This script performs the following tasks:
@@ -20,10 +20,8 @@ Last Change:
 
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import xgboost as xgb
-from sklearn.metrics import mean_squared_error
 
 model_var = 'xgboost'
 # Select model: Model_A, Model_A+ (not implemented yet)
@@ -46,7 +44,7 @@ elif model_config == 'Model_A+':
 file_path = '/media/data/Datasets/Model_A_norm.csv'
 #file_path = '/media/data/Datasets/Model_A+_norm.csv'
 
-# Input data for prediction
+
 data = pd.read_csv(file_path)
 input_data = data[feature_columns]
 target_data = data[target]
@@ -57,29 +55,21 @@ if model_var == 'xgboost':
     model = xgb.Booster()
     model.load_model(f'{path_loadmodel}.json')
 
-    # Datatype change
     dinput_data = xgb.DMatrix(input_data)
 
-    # XGBoost predicitions
-    #predictions = model.predict(dinput_data)
-
-    #mse_error = mean_squared_error(target_data, predictions)
-    #rmse_error = np.sqrt(mse_error)
 
 importance = model.get_score(importance_type='gain')
 
-# Create a mapping between feature indices (f0, f1, ...) and the actual feature names
 feature_name_map = {f'f{i}': feature_columns[i] for i in range(len(feature_columns))}
 
-# Replace numeric feature names (f0, f1, ...) with actual feature names
 importance_with_names = {feature_name_map[key]: value for key, value in importance.items()}
 
-# Convert importance to a pandas DataFrame
 importance_df = pd.DataFrame(importance_with_names.items(), columns=['Feature', 'Importance'])
 importance_df = importance_df.sort_values(by='Importance', ascending=False)
 
-# Plot feature importance
 importance_df.plot(kind='bar', x='Feature', y='Importance', legend=False)
+
+plt.ion()
 plt.title('Feature Importance by Gain', fontsize=20)
 plt.ylabel('Importance', fontsize=18)
 plt.xlabel('Features', fontsize=18)
@@ -88,4 +78,4 @@ plt.xticks(fontsize=16)
 plt.tight_layout()
 plt.show()
 
-print('fin')
+plt.savefig('Feature-Importance-Gain_Model-A.norm.png', format='png')
