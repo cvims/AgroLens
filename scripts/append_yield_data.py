@@ -10,17 +10,16 @@ from shapely.geometry import Point
 # USER-DEFINED PATHS
 # ------------------------------------------------------------------------------
 # 1) The path to your input CSV
-csv_input = "/media/data/Datasets/Model_A+_Soil+Sentinel_v4_with_weather.csv"
+csv_input = "/media/data/Datasets/Model_A.csv"
 
 # 2) Two directories containing T 2010 data for Theme 5 and Theme 6
 #    (Adjust these paths to your actual folder structure)
 t2010_directories = [
-    "/media/data/Datasets/Crop/Theme 5 Actual Yields and Production/T/2010",
-    "/media/data/Datasets/Crop/Theme 6 Yield and Production Gaps/T/2010"
+    "/media/data/Datasets/Crop/Theme 5 Actual Yields and Production/T/2010"
 ]
 
 # 3) Output Excel file
-csv_output = "/media/data/Datasets/Model_A+_Soil+Sentinel_v4_with_weather+yield.csv"
+csv_output = "/media/data/Datasets/Model_A+_yield.csv"
 
 # ------------------------------------------------------------------------------
 # FUNCTION: SAMPLE RASTER AT GIVEN LAT, LON
@@ -59,23 +58,22 @@ def main():
     if "TH_LAT" not in df.columns or "TH_LONG" not in df.columns:
         raise ValueError("CSV must have columns named TH_LAT and TH_LONG.")
 
-    # 2. Collect all *yld.tif and *qga.tif file paths from both directories
+    # 2. Collect all *yld.tif file paths from both directories
     tif_files = []
     for directory in t2010_directories:
-        # Recursively search for all *yld.tif and *qga.tif
+        # Recursively search for all *yld.tif
         tif_files.extend(glob.glob(os.path.join(directory, "*yld.tif")))
-        tif_files.extend(glob.glob(os.path.join(directory, "*qga.tif")))
 
     # Sort the list
     tif_files = sorted(tif_files)
 
-    # 3. For each qga.tif, sample the raster for each row in df
+    # 3. For each yld.tif, sample the raster for each row in df
     #    We'll create one new column per TIFF.
     for tif_path in tif_files:
         # Generate a short column name from the file
-        # e.g., "brl_2010_qga" from "brl_2010_qga.tif"
+        # e.g., "brl_2010_yld" from "brl_2010_yld.tif"
         base_name = os.path.splitext(os.path.basename(tif_path))[0]
-        col_name = f"{base_name}_val"  # e.g. "brl_2010_qga_val"
+        col_name = f"{base_name}_val"  # e.g. "brl_2010_yld_val"
 
         print(f"Sampling from: {tif_path} -> {col_name}")
 

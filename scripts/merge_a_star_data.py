@@ -1,9 +1,9 @@
 import pandas as pd
 
 # Define file paths
-input_file1 = "/media/data/Datasets/Model_A+_Soil+Sentinel_v4_with_weather+yield_norm.csv"
-input_file2 = "/media/data/Datasets/Model_A+_1024_Clay_Embeddings_znorm.csv"
-output_file = "/media/data/Datasets/Model_A+_norm.csv"
+input_file1 = "/media/data/Datasets/Model_A+_weather.csv" # File 1, modify accordingly
+input_file2 = "/media/data/Datasets/Model_A+_yield.csv"   # File 2, modify accordingly
+output_file = "/media/data/Datasets/Model_A+.csv"
 
 # Load the CSV files into DataFrames
 df1 = pd.read_csv(input_file1)
