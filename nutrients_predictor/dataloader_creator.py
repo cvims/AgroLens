@@ -1,8 +1,7 @@
 import pandas as pd
+from regression_dataset import RegressionDataset
 from sklearn.model_selection import KFold, train_test_split
 from torch.utils.data import DataLoader, random_split
-
-from nutrients_predictor.regression_dataset import RegressionDataset
 
 
 class DataloaderCreator:

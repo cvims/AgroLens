@@ -1,7 +1,6 @@
 import joblib
 import numpy as np
 import optuna
-import plotly.graph_objects as go
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 
@@ -55,17 +54,6 @@ def run_random_forest_train(X_train, X_test, Y_train, Y_test, path_savemodel):
         ),
         n_trials=10,
     )
-    plot_data = optuna.visualization.plot_param_importances(
-        study, evaluator=None, params=None, target=None, target_name="Objective Value"
-    )
-    fig = go.Figure(plot_data)
-    fig.update_layout(
-        title="Random Forest Parameter Sensitivity",
-        xaxis_title="Relative Sensitivity",
-        yaxis_title="Parameter",
-        font=dict(size=18),
-    )
-    fig.show()
 
     print("Best hyperparameters:", study.best_params)
     print("Best RMSE:", study.best_value)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Script to plot the raw pixel data for virualization and interpretation
+# Script to plot the raw pixel data for visualization and interpretation
 
 import matplotlib.pyplot as plt
 import numpy as np

@@ -3,11 +3,10 @@ import json
 import os
 from pathlib import Path
 
+import neural_network_predictor as nn_pred
+import random_forest_predictor as rf_pred
 import xgboost_predictor
-
-import nutrients_predictor.neural_network_predictor as nn_pred
-import nutrients_predictor.random_forest_predictor as rf_pred
-from nutrients_predictor.dataloader_creator import DataloaderCreator
+from dataloader_creator import DataloaderCreator
 
 
 def run_model(model_var, model_config, target, validation, include_optional_data=True):
@@ -94,7 +93,7 @@ def main():
     to train and save models for each combination.
     """
 
-    model_vars = ["rf", "nn", "xgboost"]
+    model_vars = ["xgboost", "nn", "rf"]
     # model_configs = ["Model_A", "Model_A+"]
     targets = ["pH_CaCl2", "pH_H2O", "P", "N", "K"]
 
@@ -102,7 +101,7 @@ def main():
     model_var = "xgboost"  # Specify the model variant to be used: xgboost, nn, rf
     target = "pH_CaCl2"  # Select target nutrient 'pH_CaCl2', 'pH_H2O', 'P', 'N', 'K'
     include_optional_data = True  # Currently comprises Clay data
-    # validation = "Single"  # Select validation method 'Single' or 'Spatial' (Spatial Cross Validation is only available for XGBoost)
+    validation = "Single"  # Select validation method 'Single' or 'Spatial' (Spatial Cross Validation is only available for XGBoost)
 
     # Loop over model variants and target nutrients
     for model_var in model_vars:
@@ -112,7 +111,9 @@ def main():
             print(
                 f"Training with Model Config: {model_config}, Model: {model_var}, Target: {target}, Optional Data: {include_optional_data}"
             )
-            run_model(model_var, model_config, target, include_optional_data)
+            run_model(
+                model_var, model_config, target, validation, include_optional_data
+            )
             print()
     print("-" * 30)
     print("Done!")

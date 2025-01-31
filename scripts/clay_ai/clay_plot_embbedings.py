@@ -9,7 +9,7 @@ import numpy as np
 It means that thr 1024 embeddings can be visualized as a plot of 32x32 pixels
 """
 
-filepath_embeddings = "250116_clay_embeddings.csv"
+filepath_embeddings = "clay_embeddings.csv"
 
 
 data = np.loadtxt(filepath_embeddings, delimiter=",")

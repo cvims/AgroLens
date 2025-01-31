@@ -1,5 +1,4 @@
 import optuna
-import plotly.graph_objects as go
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -320,18 +319,6 @@ def run_nn_train(input_size, train_loader, test_loader, model_savepath):
         n_trials=20,
         timeout=600,
     )
-
-    plot_data = optuna.visualization.plot_param_importances(
-        study, evaluator=None, params=None, target=None, target_name="Objective Value"
-    )
-    fig = go.Figure(plot_data)
-    fig.update_layout(
-        title="Fully Connected NN Parameter Sensitivity",
-        xaxis_title="Relative Sensitivity",
-        yaxis_title="Parameter",
-        font=dict(size=18),
-    )
-    fig.show()
 
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
