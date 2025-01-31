@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# Preprocesses the WoSIS SOIL CSV
+
 import pandas as pd
 
 WOSIS_INPUT = "/home/ubuntu/Data/Datasets/Soil/raw/WoSIS/"

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# Queries and adds Open Weather Map data to a given soil data CSV
 import csv
 import os
 from datetime import datetime

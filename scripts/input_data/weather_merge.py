@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
+# Merge weather data (columns starting with "OW_") from PARTIAL_WEATHER_PATH
+# into INPUT_PATH, keyed by POINTID. Any missing or partial values become 0.
+
 import csv
 
 # Adjust these paths as needed:
@@ -10,11 +13,6 @@ OUTPUT_PATH = "/media/data/Datasets/Model_A+_Soil+Sentinel_v4_with_weather.csv"
 
 
 def main():
-    """
-    Merge weather data (columns starting with "OW_") from PARTIAL_WEATHER_PATH
-    into INPUT_PATH, keyed by POINTID. Any missing or partial values become 0.
-    """
-
     # ---------------------------------------------------------
     # 1) Read the "partial" file into a dictionary keyed by POINTID
     # ---------------------------------------------------------

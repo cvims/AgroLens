@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# Normalizes all numeric columns in a CSV data table
+# Exclusions are possible
 import pandas as pd
 
 

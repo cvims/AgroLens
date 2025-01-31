@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# Preprocesses the LUCAS SOIL CSV
+
 import pandas as pd
 
 # Specify LUCAS Soil path here

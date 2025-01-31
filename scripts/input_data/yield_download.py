@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# Queries Yield data for a given soil data CSV and generates a combined CSV table
+
 import glob
 import os
 
@@ -18,7 +20,7 @@ t2010_directories = [
     "/media/data/Datasets/Crop/Theme 5 Actual Yields and Production/T/2010"
 ]
 
-# 3) Output Excel file
+# 3) Output CSV file
 csv_output = "/media/data/Datasets/Model_A+_yield.csv"
 
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Downloads and crops all Sentinel-2 images in the given CSV table
+# Output folder is $SENTINEL_DIR
+
 import argparse
 import os
 import shutil
@@ -13,7 +16,7 @@ sys.path.append(str(Path(os.path.abspath(__file__)).parent.parent.parent))
 from satellite_utils.copernicus_api import CopernicusApi
 
 
-class ThreadPrefixStd:
+class ThreadPrefix:
     """
     Used to prefix '[Thread Name]' to every output message of a thread.
     """
@@ -65,9 +68,9 @@ def setup_parser() -> argparse.Namespace:
     global api_threads, download_threads, crop_threads, mapping_file
 
     parser = argparse.ArgumentParser(
-        description="Downloads and crops all Sentinel 2 images in the given CSV table. \n\n"
+        description="Downloads and crops all Sentinel-2 images in the given CSV table. \n\n"
         "Required environment variables: \n"
-        "SENTINEL_DIR: Target directory for the cropped Sentinel 2 files \n"
+        "SENTINEL_DIR: Target directory for the cropped Sentinel-2 files \n"
         "TMP_DIR: Temporary working directory (ramdisk recommended) \n"
         "COPERNICUS_USER: Copernicus API user \n"
         "COPERNICUS_PASSWORD: Copernicus API password \n"
@@ -251,13 +254,12 @@ def main():
 
     args = setup_parser()
 
-    if mapping_file:
-        if not os.path.isfile(mapping_file):
-            with open(mapping_file, "w") as file:
-                print(
-                    "POINTID,SURVEY_DATE,TH_LAT,TH_LONG,SENTINEL_DATE,SENTINEL_ID",
-                    file=file,
-                )
+    if mapping_file and not os.path.isfile(mapping_file):
+        with open(mapping_file, "w") as file:
+            print(
+                "POINTID,SURVEY_DATE,TH_LAT,TH_LONG,SENTINEL_DATE,SENTINEL_ID",
+                file=file,
+            )
 
     data = pd.read_csv(args.input, sep=",", header=0)
 
@@ -288,8 +290,8 @@ def main():
     for i in range(crop_threads):
         threads_crop.append(threading.Thread(target=crop_thread, args=(i,)))
 
-    sys.stdout = ThreadPrefixStd(sys.__stdout__)
-    sys.stderr = ThreadPrefixStd(sys.__stderr__)
+    sys.stdout = ThreadPrefix(sys.__stdout__)
+    sys.stderr = ThreadPrefix(sys.__stderr__)
 
     for thread in threads_api + threads_download + threads_crop:
         thread.start()
@@ -305,7 +307,7 @@ def main():
     for thread in threads_crop:
         thread.join()
 
-    print(f"--- Finished downloading {data_length} Sentinel 2 datasets.")
+    print(f"--- Finished downloading {data_length} Sentinel-2 datasets.")
     print(f"Failed: {errors}")
 
 

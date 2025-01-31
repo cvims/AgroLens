@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# Generates Clay embeddings for a given CSV data table with normalized pixel data
+
 import numpy as np
 import pandas as pd
 import torch
@@ -14,10 +16,7 @@ waves: list[:band] - wavelengths of each band of the sensor from the metadata.ya
 gsd: scalar - gsd of the sensor from metadata.yaml file
 """
 
-# Specify the columns to import the raw pixels data using their names in header
-
 filepath = "../Model_A+_Soil+Sentinel_9x9.csv"
-
 
 data_header = pd.read_csv(filepath, sep=",", nrows=0)
 print(data_header.shape)
@@ -35,7 +34,6 @@ data_bands = pd.read_csv(
 )
 print(data_bands.shape)
 
-
 # latlon: batch x 4 - horizontally stacked lat_norm & lon_norm
 latlong = pd.DataFrame()
 latlong["lat_sin"] = np.sin(data_lat * np.pi / 180)
@@ -46,19 +44,15 @@ print(latlong.head, latlong.shape)
 
 latlong_clay = latlong.to_numpy()
 
-
 # time: batch x 4 - horizontally stacked week_norm & hour_norm
 # time is set to zero, since we don't consider the timestamps in the format of week and hour
 time = pd.DataFrame(np.zeros((data_bands.shape[0], 4)))
 print(time.head, time.shape)
-
 time_clay = time.to_numpy()
-
 
 """
 pixels: batch x band x height x width - normalized chips of a sensor
 we use 12 bands with pro chip 9x9 pixels and the data of pixels is already normalized imported
-
 
 list_bands = [
         "B01",
@@ -108,12 +102,9 @@ model = ClayMAEModule.load_from_checkpoint(
     shuffle=False,
 )
 model.eval()
-
 model = model.to(device)
 
-
 # Prepare additional information of wavelength and gsd
-
 """
     wavelength:
       water quality: 0.443
@@ -133,7 +124,6 @@ gsd = 60
 waves = [0.443, 0.493, 0.56, 0.665, 0.704, 0.74, 0.783, 0.842, 0.865, 0.945, 1.61, 2.19]
 platform = "sentinel-2-l2a"
 
-
 # pack all the data into a data cube in form of a dictionary as input for clay
 datacube = {
     "platform": platform,
@@ -149,7 +139,6 @@ datacube = {
 }
 
 # run the clay model for the embeddings using the data cube above
-
 with torch.no_grad():
     unmsk_patch, unmsk_idx, msk_idx, msk_matrix = model.model.encoder(datacube)
 

@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# Adds Sentinel-2 band pixel data extracted from $SENTINEL_DIR to the given CSV table
+
 import argparse
 import os
 import sys
@@ -15,9 +17,9 @@ from satellite_utils.image_utils import ImageUtils
 
 def setup_parser() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Adds Sentinel 2 band pixel data to the given CSV table \n\n"
+        description="Adds Sentinel-2 band pixel data to the given CSV table \n\n"
         "Required environment variables: \n"
-        "SENTINEL_DIR: Directory with the cropped Sentinel 2 files",
+        "SENTINEL_DIR: Directory with the cropped Sentinel-2 files",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
@@ -32,7 +34,7 @@ def setup_parser() -> argparse.Namespace:
     parser.add_argument(
         "--normalize",
         "-n",
-        help="Add normalized Sentinel 2 columns?",
+        help="Add normalized Sentinel-2 columns?",
         default=False,
         const=True,
         nargs="?",
@@ -40,7 +42,7 @@ def setup_parser() -> argparse.Namespace:
     parser.add_argument(
         "--flatten",
         "-f",
-        help="Flatten Sentinel 2 value matrices into separate columns? (Only useful when 'shape' is a matrix)",
+        help="Flatten Sentinel-2 value matrices into separate columns? (Only useful when 'shape' is a matrix)",
         default=False,
         const=True,
         nargs="?",

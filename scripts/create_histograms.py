@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# Script to generate histograms for a given CSV data table
+
 import os
 
 import matplotlib.pyplot as plt
@@ -7,7 +9,7 @@ import pandas as pd
 
 def main():
     # ----- CONFIGURATION -----
-    input_csv = "/media/data/Datasets/Model_A+.csv"  # CSV file to read from
+    input_csv = f"{os.environ["DATASET_PATH"]}/Model_A+.csv"
     histogram_folder = "/media/data/Datasets/Histograms_A+"
 
     # Create the histogram folder if it doesn't already exist

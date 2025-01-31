@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# Script to plot generated Clay embeddings loaded from a CSV table
 import matplotlib.pyplot as plt
 import numpy as np
 
