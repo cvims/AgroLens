@@ -3,7 +3,6 @@ boto3==1.35.81
 gdal==3.8.4
 geopandas==1.0.1
 joblib==1.4.2
-jupyter==1.1.1
 matplotlib==3.9.2
 numpy==1.26.4
 optuna==4.1.0

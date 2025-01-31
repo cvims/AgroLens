@@ -9,8 +9,8 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import boto3
+import cv2
 import numpy as np
-import rasterio
 import requests
 
 from satellite_utils.image_utils import ImageUtils
@@ -355,6 +355,15 @@ class CopernicusApi:
 
     @staticmethod
     def _restructure_sentinel(target_path: Path, root_path: Path) -> None:
+        """
+        Restructures the Sentinel-2 dataset folder by moving and renaming
+        all files according to a defined standard (documented under _extract).
+
+        Parameters:
+            target_path (Path): Target folder to extract to
+            root_path (Path): Root path of the unzipped Landsat dataset
+        """
+
         # get image directory
         path = root_path / "GRANULE"
         path = path / os.listdir(path)[0]
@@ -380,6 +389,14 @@ class CopernicusApi:
 
     @staticmethod
     def _restructure_landsat(target_path: Path, root_path: Path) -> None:
+        """
+        Restructures the Landsat dataset folder by moving and renaming
+        all files according to a defined standard (documented under _extract).
+
+        Parameters:
+            target_path (Path): Target folder to extract to
+            root_path (Path): Root path of the unzipped Landsat dataset
+        """
         os.rename(root_path, target_path)
         os.mkdir(target_path / "IMG_DATA")
         os.mkdir(target_path / "QI_DATA")
@@ -406,7 +423,7 @@ class CopernicusApi:
         """
         Checks if there is a cloud on the given GPS position of the given product
         by downloading and checking the cloud mask from S3.
-        Works only for Sentinel 2 data.
+        Works only for Sentinel-2 data.
 
         Parameters:
             feature (dict): Feature dict from the Copernicus API
@@ -456,7 +473,7 @@ class CopernicusApi:
         input_file: str, x: int, y: int, radius: int = 5, threshold: int = 20
     ) -> bool:
         """
-        Checks whether the given pixel and its neighboring pixels are covered by clouds. (Sentinel 2 only)
+        Checks whether the given pixel and its neighboring pixels are covered by clouds. (Sentinel-2 only)
 
         Parameters:
             input_file (str): Path to the input file (GeoTIFF with bands).
@@ -468,14 +485,12 @@ class CopernicusApi:
         Returns:
             bool: True if clouds cover the middle pixel or neighboring pixels, otherwise False.
         """
-        with rasterio.open(input_file) as src:
-            cloud_band = src.read(1)  # Band 1 for MSK_CLDPRB
-            # Select middle pixel and neighboring pixel
-            region = cloud_band[
-                y - radius : y + radius,
-                x - radius : x + radius,
-            ]
-            # Check whether a pixel is above the threshold value
-            cloud_present = np.any(region >= threshold)
+        img = cv2.imread(str(input_file), 0)
+        region = img[
+            y - radius : y + radius,
+            x - radius : x + radius,
+        ]
+        # Check whether a pixel is above the threshold value
+        cloud_present = np.any(region >= threshold)
 
         return cloud_present
