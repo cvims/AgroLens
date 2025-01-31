@@ -1,19 +1,26 @@
 import joblib
 import numpy as np
 import optuna
-import pandas as pd
+import plotly.graph_objects as go
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
-import plotly.graph_objects as go
 
 
 def objective(trial, X_train, X_test, Y_train, Y_test, save_path=None):
     param = {
-        'n_estimators': trial.suggest_int('n_estimators', 50, 500),  # Amount of the trees
-        'max_depth': trial.suggest_int('max_depth', 3, 30),  # Maximum tree depth
-        'min_samples_split': trial.suggest_int('min_samples_split', 2, 20),  # Minimum number of samples for split
-        'min_samples_leaf': trial.suggest_int('min_samples_leaf', 1, 20),  # Minimum number of samples in sheets
-        'max_features': trial.suggest_float('max_features', 0.1, 1.0)  # Maximum number of features for splits
+        "n_estimators": trial.suggest_int(
+            "n_estimators", 50, 500
+        ),  # Amount of the trees
+        "max_depth": trial.suggest_int("max_depth", 3, 30),  # Maximum tree depth
+        "min_samples_split": trial.suggest_int(
+            "min_samples_split", 2, 20
+        ),  # Minimum number of samples for split
+        "min_samples_leaf": trial.suggest_int(
+            "min_samples_leaf", 1, 20
+        ),  # Minimum number of samples in sheets
+        "max_features": trial.suggest_float(
+            "max_features", 0.1, 1.0
+        ),  # Maximum number of features for splits
     }
 
     model = RandomForestRegressor(**param, random_state=42)
@@ -22,8 +29,8 @@ def objective(trial, X_train, X_test, Y_train, Y_test, save_path=None):
     Y_pred = model.predict(X_test)
     mse = mean_squared_error(Y_test, Y_pred)
     rmse = np.sqrt(mse)
-    print(f'RMSE of Trial {trial.number}: {rmse}')
-    
+    print(f"RMSE of Trial {trial.number}: {rmse}")
+
     # Save model with the best performance
     if save_path and (trial.number == 0 or rmse < trial.study.best_value):
         joblib.dump(model, save_path)
@@ -31,13 +38,26 @@ def objective(trial, X_train, X_test, Y_train, Y_test, save_path=None):
 
     return rmse
 
+
 def run_random_forest_train(X_train, X_test, Y_train, Y_test, path_savemodel):
-    
-    study = optuna.create_study(direction='minimize')  # Minimize RMSE
-    study.optimize(lambda trial: objective(trial, X_train, X_test, Y_train, Y_test, path_savemodel), n_trials=10)
-    plot_data = optuna.visualization.plot_param_importances(study, evaluator=None, params=None, target=None, target_name='Objective Value')
+
+    study = optuna.create_study(direction="minimize")  # Minimize RMSE
+    study.optimize(
+        lambda trial: objective(
+            trial, X_train, X_test, Y_train, Y_test, path_savemodel
+        ),
+        n_trials=10,
+    )
+    plot_data = optuna.visualization.plot_param_importances(
+        study, evaluator=None, params=None, target=None, target_name="Objective Value"
+    )
     fig = go.Figure(plot_data)
-    fig.update_layout(title="Random Forest Parameter Sensitivity",xaxis_title="Relative Sensitivity",yaxis_title="Parameter", font=dict(size=18))
+    fig.update_layout(
+        title="Random Forest Parameter Sensitivity",
+        xaxis_title="Relative Sensitivity",
+        yaxis_title="Parameter",
+        font=dict(size=18),
+    )
     fig.show()
 
     print("Beste Hyperparameter:", study.best_params)

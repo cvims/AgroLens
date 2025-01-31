@@ -1,9 +1,7 @@
-import dataloader_predictor as DL
 import optuna
 import plotly.graph_objects as go
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from optuna.trial import TrialState
 
@@ -18,12 +16,19 @@ class RegressionNet(nn.Module):
         fc3 (nn.Linear): The third fully connected layer.
         output (nn.Linear): The output layer producing a single value.
         dropout (nn.Dropout): Dropout layer to prevent overfitting.
-    
+
     Methods:
         forward(x):
             Defines the forward pass through the network.
-    """  
-    def __init__(self, input_size=12, hidden_sizes=[64, 32, 16], output_size=1, dropout_rates=[0.3, 0.3, 0.3]):
+    """
+
+    def __init__(
+        self,
+        input_size=12,
+        hidden_sizes=[64, 32, 16],
+        output_size=1,
+        dropout_rates=[0.3, 0.3, 0.3],
+    ):
         """
         Initializes the network with specified input, hidden, and output sizes.
 
@@ -37,7 +42,9 @@ class RegressionNet(nn.Module):
         layers = []
         in_features = input_size
 
-        for i, (hidden_size, dropout_rate) in enumerate(zip(hidden_sizes, dropout_rates)):
+        for i, (hidden_size, dropout_rate) in enumerate(
+            zip(hidden_sizes, dropout_rates)
+        ):
             layers.append(nn.Linear(in_features, hidden_size))
             layers.append(nn.ReLU())
             layers.append(nn.Dropout(dropout_rate))
@@ -45,10 +52,10 @@ class RegressionNet(nn.Module):
 
         layers.append(nn.Linear(in_features, output_size))  # Ausgabeschicht
         self.model = nn.Sequential(*layers)
-        
 
     def forward(self, x):
         return self.model(x)
+
 
 class TrainingPipeline:
     """
@@ -64,15 +71,25 @@ class TrainingPipeline:
         batch_size (int): Batch size for training and evaluation.
         num_epochs (int): Number of training epochs.
         device (torch.device): The device to run the model on ('cuda' or 'cpu').
-    
+
     Methods:
         train():
             Trains the model using the training dataset.
         evaluate():
             Evaluates the model using the testing dataset.
     """
-    def __init__(self, train_loader, test_loader, model, learning_rate=0.001, optimizer_type="Adam", 
-                 criterion=None, batch_size=32, num_epochs=10):
+
+    def __init__(
+        self,
+        train_loader,
+        test_loader,
+        model,
+        learning_rate=0.001,
+        optimizer_type="Adam",
+        criterion=None,
+        batch_size=32,
+        num_epochs=10,
+    ):
         """
         Initializes the training pipeline with specified parameters.
 
@@ -89,7 +106,7 @@ class TrainingPipeline:
         self.test_loader = test_loader
         self.learning_rate = learning_rate
         self.optimizer_type = optimizer_type
-        self.criterion = criterion if criterion is not None else nn.MSELoss()        
+        self.criterion = criterion if criterion is not None else nn.MSELoss()
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -97,9 +114,13 @@ class TrainingPipeline:
 
     def _get_optimizer(self):
         if self.optimizer_type == "SGD":
-            return optim.SGD(self.model.parameters(), lr=self.learning_rate, weight_decay=0.01)
+            return optim.SGD(
+                self.model.parameters(), lr=self.learning_rate, weight_decay=0.01
+            )
         elif self.optimizer_type == "Adam":
-            return optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=0.01)
+            return optim.Adam(
+                self.model.parameters(), lr=self.learning_rate, weight_decay=0.01
+            )
         else:
             raise ValueError(f"Unsupported optimizer type: {self.optimizer_type}")
 
@@ -124,14 +145,18 @@ class TrainingPipeline:
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.item()
-            print(f"Epoch {epoch + 1}/{self.num_epochs}, Loss: {running_loss / len(self.train_loader):.4f}")
+            print(
+                f"Epoch {epoch + 1}/{self.num_epochs}, Loss: {running_loss / len(self.train_loader):.4f}"
+            )
             self.evaluate()
 
-        print('Overview trained model:',self.model)
+        print("Overview trained model:", self.model)
         total_params = sum(p.numel() for p in self.model.parameters())
-        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-        print(f'Total parameters: {total_params}')
-        print(f'Trainable parameters: {trainable_params}')
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print(f"Total parameters: {total_params}")
+        print(f"Trainable parameters: {trainable_params}")
 
     def evaluate(self):
         """
@@ -153,7 +178,7 @@ class TrainingPipeline:
         avg_test_loss = test_loss / len(self.test_loader)
         print(f"Test Loss: {avg_test_loss:.4f}")
         return avg_test_loss
-    
+
     def save_model(self, file_path):
         """
         Saves the trained model to the specified file path, along with its architecture and metadata.
@@ -162,26 +187,31 @@ class TrainingPipeline:
             file_path (str): The path where the model will be saved.
         """
         if isinstance(self.criterion, nn.MSELoss):
-            save_loss = 'MSE'
+            save_loss = "MSE"
         elif isinstance(self.criterion, nn.L1Loss):
-            save_loss = 'MAE'
+            save_loss = "MAE"
         elif isinstance(self.criterion, nn.SmoothL1Loss):
-            save_loss = 'Huber'
+            save_loss = "Huber"
         else:
-            save_loss = 'Unknown'
+            save_loss = "Unknown"
 
         model_info = {
             "input_size": self.model.model[0].in_features,
-            "hidden_sizes": [layer.out_features for layer in self.model.model if isinstance(layer, nn.Linear)][:-1],
+            "hidden_sizes": [
+                layer.out_features
+                for layer in self.model.model
+                if isinstance(layer, nn.Linear)
+            ][:-1],
             "output_size": self.model.model[-1].out_features,
-            "dropout_rates": [layer.p for layer in self.model.model if isinstance(layer, nn.Dropout)],
-            "loss_function": save_loss
+            "dropout_rates": [
+                layer.p for layer in self.model.model if isinstance(layer, nn.Dropout)
+            ],
+            "loss_function": save_loss,
         }
 
-        torch.save({
-            "model_info": model_info,
-            "state_dict": self.model.state_dict()
-        }, file_path)
+        torch.save(
+            {"model_info": model_info, "state_dict": self.model.state_dict()}, file_path
+        )
         print(f"Model saved to {file_path}")
 
     @staticmethod
@@ -202,13 +232,14 @@ class TrainingPipeline:
             input_size=model_info["input_size"],
             hidden_sizes=model_info["hidden_sizes"],
             output_size=model_info["output_size"],
-            dropout_rates=model_info["dropout_rates"]
+            dropout_rates=model_info["dropout_rates"],
         )
         model.load_state_dict(checkpoint["state_dict"])
         model.eval()
 
         print(f"Model loaded with architecture: {model_info}")
         return model
+
 
 def objective(input_size, trial, train_loader, test_loader, path_savemodel):
     """
@@ -223,20 +254,26 @@ def objective(input_size, trial, train_loader, test_loader, path_savemodel):
     Returns:
         float: The test loss after training the model, which Optuna will try to minimize.
     """
-    
+
     # Dynamic amount of layer
     n_layers = trial.suggest_int("n_layers", 3, 9)
-    
+
     # Dynamic adjustment of neurons and dropout rate
-    hidden_sizes = [trial.suggest_int(f"n_units_l{i}", 8, 128, 4) for i in range(n_layers)]
-    dropout_rates = [trial.suggest_float(f"dropout_l{i}", 0.1, 0.5) for i in range(n_layers)]
-    
+    hidden_sizes = [
+        trial.suggest_int(f"n_units_l{i}", 8, 128, 4) for i in range(n_layers)
+    ]
+    dropout_rates = [
+        trial.suggest_float(f"dropout_l{i}", 0.1, 0.5) for i in range(n_layers)
+    ]
+
     learning_rate = trial.suggest_float("learning_rate", 1e-4, 1e-2, log=True)
     optimizer_type = trial.suggest_categorical("optimizer", ["SGD", "Adam"])
     batch_size = trial.suggest_categorical("batch_size", [16, 32, 64])
 
     # Define model
-    model = RegressionNet(input_size=input_size, hidden_sizes=hidden_sizes, dropout_rates=dropout_rates)
+    model = RegressionNet(
+        input_size=input_size, hidden_sizes=hidden_sizes, dropout_rates=dropout_rates
+    )
 
     pipeline = TrainingPipeline(
         train_loader=train_loader,
@@ -246,40 +283,52 @@ def objective(input_size, trial, train_loader, test_loader, path_savemodel):
         optimizer_type=optimizer_type,
         criterion=nn.MSELoss(),
         batch_size=batch_size,
-        num_epochs=20
+        num_epochs=20,
     )
 
     # Train the model and evaluate its performance
     pipeline.train()
     test_loss = pipeline.evaluate()
-    
-    
+
     # Save model with the best performance
     if trial.number == 0 or test_loss < trial.study.best_value:
         pipeline.save_model(path_savemodel)
-        print(f'Model with Loss {test_loss} saved.')
+        print(f"Model with Loss {test_loss} saved.")
 
     return test_loss
 
-    
+
 def run_nn_train(input_size, train_loader, test_loader, path_savemodel):
     """
-        Runs the training of a regression neuronal network using Optuna and manages model files.
+    Runs the training of a regression neuronal network using Optuna and manages model files.
 
-        Args:
-            train_loader (DataLoader): DataLoader for the training dataset.
-            test_loader (DataLoader): DataLoader for the testing/validation dataset.
-            path_savemodel (str): Path of the saved model file.
+    Args:
+        train_loader (DataLoader): DataLoader for the training dataset.
+        test_loader (DataLoader): DataLoader for the testing/validation dataset.
+        path_savemodel (str): Path of the saved model file.
 
-        """
+    """
 
     # Create optuna study
-    study = optuna.create_study(direction='minimize')
-    study.optimize(lambda trial: objective(input_size, trial, train_loader, test_loader, path_savemodel), n_trials=20, timeout=600)
+    study = optuna.create_study(direction="minimize")
+    study.optimize(
+        lambda trial: objective(
+            input_size, trial, train_loader, test_loader, path_savemodel
+        ),
+        n_trials=20,
+        timeout=600,
+    )
 
-    plot_data = optuna.visualization.plot_param_importances(study, evaluator=None, params=None, target=None, target_name='Objective Value')
+    plot_data = optuna.visualization.plot_param_importances(
+        study, evaluator=None, params=None, target=None, target_name="Objective Value"
+    )
     fig = go.Figure(plot_data)
-    fig.update_layout(title="Fully Connected NN Parameter Sensitivity",xaxis_title="Relative Sensitivity",yaxis_title="Parameter", font=dict(size=18))
+    fig.update_layout(
+        title="Fully Connected NN Parameter Sensitivity",
+        xaxis_title="Relative Sensitivity",
+        yaxis_title="Parameter",
+        font=dict(size=18),
+    )
     fig.show()
 
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])

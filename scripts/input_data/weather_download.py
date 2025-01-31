@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-
+#!/usr/bin/env python
 import csv
 import os
 from datetime import datetime
@@ -27,8 +26,9 @@ OW_FIELDS = [
     "OW_temp",
     "OW_wind_deg",
     "OW_wind_speed",
-    "OW_day_length"
+    "OW_day_length",
 ]
+
 
 def all_ow_fields_empty_or_zero(row, ow_fields):
     """
@@ -40,6 +40,7 @@ def all_ow_fields_empty_or_zero(row, ow_fields):
         if val != "" and val != "0":
             return False
     return True
+
 
 def main():
     """
@@ -98,14 +99,18 @@ def main():
             try:
                 date_obj = datetime.strptime(date_str, "%Y-%m-%d")
             except ValueError:
-                print(f"[{index}] POINTID {pid} Invalid date format for SENTINEL_DATE={date_str}, skipping.")
+                print(
+                    f"[{index}] POINTID {pid} Invalid date format for SENTINEL_DATE={date_str}, skipping."
+                )
                 writer.writerow(row)  # Write the row as-is
                 continue
 
             # 2) Decide whether to call the API or not
             #    We only call if *all* OW_ fields are empty or "0"
             if not all_ow_fields_empty_or_zero(row, OW_FIELDS):
-                print(f"[{index}] POINTID {pid}: OW fields already filled. Skipping API call.")
+                print(
+                    f"[{index}] POINTID {pid}: OW fields already filled. Skipping API call."
+                )
                 writer.writerow(row)
                 continue
 
@@ -138,7 +143,9 @@ def main():
             try:
                 response = requests.get(url, timeout=30)
                 if not response.ok:
-                    print(f"[{index}] POINTID {pid} ERROR {response.status_code}: {response.text}")
+                    print(
+                        f"[{index}] POINTID {pid} ERROR {response.status_code}: {response.text}"
+                    )
                     # We can still write the original row or skip
                     writer.writerow(row)
                     continue
@@ -157,19 +164,19 @@ def main():
                 data_list = data_json.get("data", [])
                 if len(data_list) > 0:
                     first_block = data_list[0]
-                    row["OW_clouds"]      = first_block.get("clouds", "0")
-                    row["OW_dew_point"]   = first_block.get("dew_point", "0")
-                    row["OW_feels_like"]  = first_block.get("feels_like", "0")
-                    row["OW_humidity"]    = first_block.get("humidity", "0")
-                    row["OW_pressure"]    = first_block.get("pressure", "0")
-                    row["OW_sunrise"]     = first_block.get("sunrise", "0")
-                    row["OW_sunset"]      = first_block.get("sunset", "0")
-                    row["OW_temp"]        = first_block.get("temp", "0")
-                    row["OW_wind_deg"]    = first_block.get("wind_deg", "0")
-                    row["OW_wind_speed"]  = first_block.get("wind_speed", "0")
+                    row["OW_clouds"] = first_block.get("clouds", "0")
+                    row["OW_dew_point"] = first_block.get("dew_point", "0")
+                    row["OW_feels_like"] = first_block.get("feels_like", "0")
+                    row["OW_humidity"] = first_block.get("humidity", "0")
+                    row["OW_pressure"] = first_block.get("pressure", "0")
+                    row["OW_sunrise"] = first_block.get("sunrise", "0")
+                    row["OW_sunset"] = first_block.get("sunset", "0")
+                    row["OW_temp"] = first_block.get("temp", "0")
+                    row["OW_wind_deg"] = first_block.get("wind_deg", "0")
+                    row["OW_wind_speed"] = first_block.get("wind_speed", "0")
 
                     sunrise = first_block.get("sunrise")
-                    sunset  = first_block.get("sunset")
+                    sunset = first_block.get("sunset")
 
                     # Compute day length if both sunrise and sunset are present
                     if sunrise and sunset:
@@ -196,6 +203,7 @@ def main():
             writer.writerow(row)
 
     print(f"Done. Output written to {output_csv_path}.")
+
 
 if __name__ == "__main__":
     main()

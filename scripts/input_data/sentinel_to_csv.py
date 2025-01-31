@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 from sklearn import preprocessing
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.image_utils import ImageUtils
+sys.path.append(str(Path(os.path.abspath(__file__)).parent.parent.parent))
+from satellite_utils.image_utils import ImageUtils
 
 
 def setup_parser() -> argparse.Namespace:

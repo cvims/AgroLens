@@ -13,7 +13,7 @@ import numpy as np
 import rasterio
 import requests
 
-from utils.image_utils import ImageUtils
+from satellite_utils.image_utils import ImageUtils
 
 
 class CopernicusApi:

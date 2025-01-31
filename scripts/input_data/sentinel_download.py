@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pandas as pd
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.copernicus_api import CopernicusApi
+sys.path.append(str(Path(os.path.abspath(__file__)).parent.parent.parent))
+from satellite_utils.copernicus_api import CopernicusApi
 
 
 class ThreadPrefixStd:
