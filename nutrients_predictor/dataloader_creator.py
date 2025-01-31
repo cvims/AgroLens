@@ -13,38 +13,32 @@ class DataloaderCreator:
         feature_columns,
         batch_size=32,
         train_split=0.8,
-        transform=None,
     ):
         """
         Initializes the DataloaderCreator class for splitting in training and test datasets based on pytorch
 
         Args:
             file_path (str): Path to the CSV file containing data (Soil nutriens and corresponding multispectral values).
-            target_column (str): ame of the target column.
+            target_column (str): name of the target column.
             batch_size (int): Batch size for the DataLoader. Default is 32.
             train_split (float): Proportion of data to use for training. Default is 0.8.
-            transform (optional): none
         """
         self.file_path = file_path
         self.target_column = target_column
         self.feature_columns = feature_columns
         self.batch_size = batch_size
         self.train_split = train_split
-        self.transform = transform
 
         self.dataset = RegressionDataset(
-            self.file_path,
-            self.target_column,
-            self.feature_columns,
-            transform=self.transform,
+            self.file_path, self.target_column, self.feature_columns
         )
 
-    def create_dataloaders(self):
+    def create_dataloaders(self) -> tuple[DataLoader, DataLoader]:
         """
         Creates the training and testing DataLoader objects.
 
         Returns:
-            tuple: The training and testing DataLoader objects.
+            tuple[DataLoader, DataLoader]: The training and testing DataLoader objects.
         """
 
         dataset = self.dataset
@@ -61,14 +55,14 @@ class DataloaderCreator:
 
         return train_loader, test_loader
 
-    def create_xgboost_data(self):
+    def create_xgboost_data(self) -> tuple:
         """
         Prepares data for XGBoost training by splitting it into training and testing sets.
         This method loads the data from the CSV file and prepares it as NumPy arrays
         for use with XGBoost or Random Forest.
 
         Returns:
-            tuple: Training and testing data (features and targets) for XGBoost.
+            tuple: Training and testing data (features and targets) for XGBoost (X_train, X_test, Y_train, Y_test).
         """
 
         data = pd.read_csv(self.file_path)
@@ -80,12 +74,12 @@ class DataloaderCreator:
             features, targets, test_size=0.2, random_state=42
         )
 
-        print(" Trainings dataset:", len(X_train), "samples")
+        print(" Training dataset:", len(X_train), "samples")
         print(" Test dataset:", len(X_test), "samples")
 
         return X_train, X_test, Y_train, Y_test
 
-    def _create_grid_ids(self):
+    def _create_grid_ids(self) -> None:
         """
         Assigns grid IDs to each data point based on geographic coordinates (TH_LAT, TH_LONG).
 
@@ -93,8 +87,7 @@ class DataloaderCreator:
         Each data point is assigned to a grid cell, and a unique grid ID is generated based on the grid cell
         coordinates (grid_x, grid_y).
 
-        Returns:
-            None: The data with grid IDs is stored in the class attribute `self.data_with_grid`.
+        The data with grid IDs is stored in the class attribute `self.data_with_grid`.
         """
         data = pd.read_csv(self.file_path)
         min_long = data["TH_LONG"].min()
@@ -107,7 +100,7 @@ class DataloaderCreator:
 
         self.data_with_grid = data
 
-    def create_scv_data(self, n_splits=5):
+    def create_scv_data(self, n_splits=5) -> tuple[list, tuple]:
         """
         Create spatial cross-validation splits for XGBoost.
 
@@ -116,7 +109,6 @@ class DataloaderCreator:
 
         Args:
             n_splits (int): Number of folds. Default is 5.
-            validation_split (float): Fraction of data to be used as validation set.
 
         Returns:
             tuple: (folds, validation_data)
@@ -125,14 +117,8 @@ class DataloaderCreator:
         """
 
         self.grid_size = 4
-        val_grids = [
-            "0_0",
-            "0_2",
-            "0_1",
-            "0_4",
-            "0_5",
-            "1_5",
-        ]  # Define specific grid IDs to be used as validation data
+        # Define specific grid IDs to be used as validation data
+        val_grids = ["0_0", "0_2", "0_1", "0_4", "0_5", "1_5"]
         self.random_state = 42
 
         self._create_grid_ids()

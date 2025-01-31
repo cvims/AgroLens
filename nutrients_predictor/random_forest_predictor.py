@@ -7,20 +7,23 @@ from sklearn.metrics import mean_squared_error
 
 
 def objective(trial, X_train, X_test, Y_train, Y_test, save_path=None):
+    """
+    This function defines the optimization objective for the Optuna study. It:
+    - Defines the hyperparameters to be tuned by Optuna.
+    - Trains the random forest model with the given hyperparameters.
+    - Calculates the RMSE of the model's predictions and saves the best model.
+    """
     param = {
-        "n_estimators": trial.suggest_int(
-            "n_estimators", 50, 500
-        ),  # Amount of the trees
-        "max_depth": trial.suggest_int("max_depth", 3, 30),  # Maximum tree depth
-        "min_samples_split": trial.suggest_int(
-            "min_samples_split", 2, 20
-        ),  # Minimum number of samples for split
-        "min_samples_leaf": trial.suggest_int(
-            "min_samples_leaf", 1, 20
-        ),  # Minimum number of samples in sheets
-        "max_features": trial.suggest_float(
-            "max_features", 0.1, 1.0
-        ),  # Maximum number of features for splits
+        # Amount of trees
+        "n_estimators": trial.suggest_int("n_estimators", 50, 500),
+        # Maximum tree depth
+        "max_depth": trial.suggest_int("max_depth", 3, 30),
+        # Minimum number of samples for split
+        "min_samples_split": trial.suggest_int("min_samples_split", 2, 20),
+        # Minimum number of samples in sheets
+        "min_samples_leaf": trial.suggest_int("min_samples_leaf", 1, 20),
+        # Maximum number of features for splits
+        "max_features": trial.suggest_float("max_features", 0.1, 1.0),
     }
 
     model = RandomForestRegressor(**param, random_state=42)
@@ -40,7 +43,11 @@ def objective(trial, X_train, X_test, Y_train, Y_test, save_path=None):
 
 
 def run_random_forest_train(X_train, X_test, Y_train, Y_test, path_savemodel):
-
+    """
+    This function initiates the XGBoost training and hyperparameter optimization process:
+    - Converts the training and testing datasets into DMatrix format for XGBoost.
+    - Creates an Optuna study to minimize the RMSE by optimizing the hyperparameters.
+    """
     study = optuna.create_study(direction="minimize")  # Minimize RMSE
     study.optimize(
         lambda trial: objective(
@@ -60,5 +67,5 @@ def run_random_forest_train(X_train, X_test, Y_train, Y_test, path_savemodel):
     )
     fig.show()
 
-    print("Beste Hyperparameter:", study.best_params)
-    print("Bester MSE-Wert:", study.best_value)
+    print("Best hyperparameters:", study.best_params)
+    print("Best RMSE:", study.best_value)

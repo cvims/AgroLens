@@ -91,14 +91,14 @@ def main():
     """
 
     model_vars = ["rf", "nn", "xgboost"]
-    model_configs = ["Model_A", "Model_A+"]
+    # model_configs = ["Model_A", "Model_A+"]
     targets = ["pH_CaCl2", "pH_H2O", "P", "N", "K"]
 
     model_config = "Model_A+"  # Select model Model_A or Model_A+ (Differs in the used feature columns)
     model_var = "xgboost"  # Specify the model variant to be used: xgboost, nn, rf
     target = "pH_CaCl2"  # Select target nutrient 'pH_CaCl2', 'pH_H2O', 'P', 'N', 'K'
     include_optional_data = True  # Currently comprises Clay data
-    validation = "Single"  # Select validation method 'Single' or 'Spatial' (Spatial Cross Validation is only for XGBoost available)
+    # validation = "Single"  # Select validation method 'Single' or 'Spatial' (Spatial Cross Validation is only available for XGBoost)
 
     # Loop over model variants and target nutrients
     for model_var in model_vars:
