@@ -3,13 +3,18 @@
 # into INPUT_PATH, keyed by POINTID. Any missing or partial values become 0.
 
 import csv
+import os
+from pathlib import Path
 
 # Adjust these paths as needed:
 PARTIAL_WEATHER_PATH = (
-    "/media/data/Datasets/Model_A+_Soil+Sentinel_v3_with_weather+yield.csv"
+    Path(os.environ["DATASET_PATH"])
+    / "Model_A+_Soil+Sentinel_v3_with_weather+yield.csv"
 )
-INPUT_PATH = "/media/data/Datasets/Model_A+_Soil+Sentinel_v4.csv"
-OUTPUT_PATH = "/media/data/Datasets/Model_A+_Soil+Sentinel_v4_with_weather.csv"
+INPUT_PATH = Path(os.environ["DATASET_PATH"]) / "Model_A+_Soil+Sentinel_v4.csv"
+OUTPUT_PATH = (
+    Path(os.environ["DATASET_PATH"]) / "Model_A+_Soil+Sentinel_v4_with_weather.csv"
+)
 
 
 def main():

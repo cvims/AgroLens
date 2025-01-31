@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # Script to read a data table, calculate the feature importance for xgboost and plot it
 
+import os
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import xgboost as xgb
@@ -10,10 +13,6 @@ model_config = "Model_A"
 
 # Select target nutrient 'pH_CaCl2', 'pH_H2O', 'P', 'N', 'K'
 target = "N"
-
-path_loadmodel = (
-    f"/media/data/Models/{model_config}/{model_var}/{model_config}_{model_var}_{target}"
-)
 
 feature_columns = [
     "norm_B01",
@@ -30,10 +29,15 @@ feature_columns = [
     "norm_B12",
 ]
 
+model_path = (
+    Path(os.environ["MODEL_PATH"])
+    / model_config
+    / model_var
+    / f"{model_config}_{model_var}_{target}.json"
+)
+
 # Input data for predicition
-file_path = "/media/data/Datasets/Model_A_norm.csv"
-
-
+file_path = Path(os.environ["DATASET_PATH"]) / f"{model_config}_norm.csv"
 data = pd.read_csv(file_path)
 input_data = data[feature_columns]
 target_data = data[target]
@@ -42,7 +46,7 @@ print(f"-----Prediction of {target} with {model_config} {model_var}-----")
 
 if model_var == "xgboost":
     model = xgb.Booster()
-    model.load_model(f"{path_loadmodel}.json")
+    model.load_model(model_path)
     dinput_data = xgb.DMatrix(input_data)
 
 importance = model.get_score(importance_type="gain")

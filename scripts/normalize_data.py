@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # Normalizes all numeric columns in a CSV data table
 # Exclusions are possible
+import os
+from pathlib import Path
+
 import pandas as pd
 
 
@@ -14,8 +17,8 @@ def main():
     """
 
     # ----- CONFIGURATION -----
-    input_csv = "/media/data/Datasets/Model_A+.csv"
-    output_csv_normalized = "/media/data/Datasets/Model_A+_norm.csv"
+    input_csv = Path(os.environ["DATASET_PATH"]) / "Model_A+.csv"
+    output_csv_normalized = Path(os.environ["DATASET_PATH"]) / "Model_A+_norm.csv"
 
     # Specify columns to exclude from normalization
     excluded_columns = [

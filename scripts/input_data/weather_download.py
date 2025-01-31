@@ -3,13 +3,13 @@
 import csv
 import os
 from datetime import datetime
+from pathlib import Path
 
 import requests
 
-# Find key in https://home.openweathermap.org/api_keys
-API_KEY = input("Open Weather Map API Key: ")
-CSV_PATH = "/media/data/Datasets/Model_A+_Soil+Sentinel_v4_with_weather.csv"
-FULL_DAY_SECONDS = 86400  # 24*60*60s
+CSV_PATH = (
+    Path(os.environ["DATASET_PATH"]) / "Model_A+_Soil+Sentinel_v4_with_weather.csv"
+)
 
 # List of all OW_ columns we wish to populate
 OW_FIELDS = [
@@ -118,7 +118,7 @@ def main():
             # If we get here, all OW fields are empty or "0" => we call the API
 
             # Convert to Unix timestamp (seconds since 1970-01-01 UTC); use noon for robustness
-            timestamp_unix = int(date_obj.timestamp()) + int(FULL_DAY_SECONDS / 2)
+            timestamp_unix = int(date_obj.timestamp()) + 43200  # 12 hours in seconds
 
             # 3) Get lat/lon from the row
             try:
@@ -135,7 +135,7 @@ def main():
                 f"?lat={lat:.5f}"
                 f"&lon={lon:.5f}"
                 f"&dt={timestamp_unix}"
-                f"&appid={API_KEY}"
+                f"&appid={os.environ["OPENWEATHERMAP_KEY"]}"
             )
 
             print(f"[{index}] POINTID {pid} Request => {url}")
