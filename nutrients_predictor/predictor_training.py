@@ -5,7 +5,7 @@ import xgboost_predictor
 
 import nutrients_predictor.neural_network_predictor as nn_pred
 import nutrients_predictor.random_forest_predictor as rf_pred
-import nutrients_predictor.regression_dataset as DL
+from nutrients_predictor.dataloader_creator import DataloaderCreator
 
 
 def run_model(model_var, model_config, target, validation, include_optional_data=True):
@@ -38,7 +38,7 @@ def run_model(model_var, model_config, target, validation, include_optional_data
     elif model_config == "Model_A+":
         file_path = "/media/data/Datasets/Model_A+_norm.csv"
 
-    dataloader_creator = DL.DataloaderCreator(file_path, target, feature_columns)
+    dataloader_creator = DataloaderCreator(file_path, target, feature_columns)
 
     if model_var == "xgboost":
         if validation == "Single":
