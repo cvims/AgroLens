@@ -1,10 +1,10 @@
+#!/usr/bin/env python
 import glob
 import os
 
 import pandas as pd
 import rasterio
 from pyproj import CRS, Transformer
-from shapely.geometry import Point
 
 # ------------------------------------------------------------------------------
 # USER-DEFINED PATHS
@@ -20,6 +20,7 @@ t2010_directories = [
 
 # 3) Output Excel file
 csv_output = "/media/data/Datasets/Model_A+_yield.csv"
+
 
 # ------------------------------------------------------------------------------
 # FUNCTION: SAMPLE RASTER AT GIVEN LAT, LON
@@ -46,6 +47,7 @@ def sample_raster(raster_path, lat, lon):
         val = next(src.sample([(x, y)]))[0]
 
     return val
+
 
 # ------------------------------------------------------------------------------
 # MAIN SCRIPT
@@ -93,6 +95,7 @@ def main():
     # 4. Write out the enriched DataFrame to an Excel file
     df.to_csv(csv_output, index=False)
     print(f"Enriched CSV file written to: {csv_output}")
+
 
 # ------------------------------------------------------------------------------
 # ENTRY POINT

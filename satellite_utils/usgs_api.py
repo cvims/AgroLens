@@ -21,7 +21,6 @@ class USGSApi:
         latitude: float,
         longitude: float,
         span: int = 14,
-        filter_clouds: bool = True,
         limit: int = 1,
     ) -> list[dict]:
         """
@@ -32,7 +31,6 @@ class USGSApi:
             latitude (float): GPS latitude
             longitude (float): GPS longitude
             span (int, optional): Maximum span of days to search in each direction (past and future), defaults to 14.
-            filter_clouds (bool, optional): Should images with clouds above the GPS position be filtered?, defaults to True.
             limit (int, optional): Maximum number of returned entries, defaults to 1.
 
         Returns:
@@ -80,17 +78,7 @@ class USGSApi:
         # sort results by difference to the desired date
         features.sort(key=lambda product: cls._productTimestampDiff(product, date))
 
-        if not filter_clouds:
-            return features[:limit]
-
-        result = []
-        for feature in features:
-            if len(result) >= limit:
-                break
-            else:
-                result.append(feature)
-
-        return result
+        return features[:limit]
 
     @classmethod
     def authenticate(cls) -> None:

@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-
 import csv
-import os
 
 # Adjust these paths as needed:
-PARTIAL_WEATHER_PATH = "/media/data/Datasets/Model_A+_Soil+Sentinel_v3_with_weather+yield.csv"
-INPUT_PATH           = "/media/data/Datasets/Model_A+_Soil+Sentinel_v4.csv"
-OUTPUT_PATH          = "/media/data/Datasets/Model_A+_Soil+Sentinel_v4_with_weather.csv"
+PARTIAL_WEATHER_PATH = (
+    "/media/data/Datasets/Model_A+_Soil+Sentinel_v3_with_weather+yield.csv"
+)
+INPUT_PATH = "/media/data/Datasets/Model_A+_Soil+Sentinel_v4.csv"
+OUTPUT_PATH = "/media/data/Datasets/Model_A+_Soil+Sentinel_v4_with_weather.csv"
+
 
 def main():
     """
-    Merge weather data (columns starting with "OW_") from PARTIAL_WEATHER_PATH 
+    Merge weather data (columns starting with "OW_") from PARTIAL_WEATHER_PATH
     into INPUT_PATH, keyed by POINTID. Any missing or partial values become 0.
     """
 
@@ -76,6 +77,7 @@ def main():
             writer.writerow(row)
 
     print(f"Done. Created {OUTPUT_PATH} with weather columns merged.")
+
 
 if __name__ == "__main__":
     main()
