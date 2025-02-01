@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Downloads and crops all Sentinel-2 images in the given CSV table (multi-threaded)
+# More information with 'sentinel_download.py -h'
+
 import argparse
 import os
 import shutil
@@ -13,7 +16,7 @@ sys.path.append(str(Path(os.path.abspath(__file__)).parent.parent.parent))
 from satellite_utils.copernicus_api import CopernicusApi
 
 
-class ThreadPrefixStd:
+class ThreadPrefix:
     """
     Used to prefix '[Thread Name]' to every output message of a thread.
     """
@@ -28,6 +31,7 @@ class ThreadPrefixStd:
         self.prefixes[threading.get_ident()] = prefix
 
     def write(self, message):
+        # prefix every output line
         with self.lock:
             if self.line_break and threading.get_ident() in self.prefixes:
                 self.stdout.write(f"{self.prefixes[threading.get_ident()]} {message}")
@@ -62,12 +66,19 @@ download_finished = False
 
 
 def setup_parser() -> argparse.Namespace:
+    """
+    Parses command line arguments
+
+    Returns:
+        argparse.Namespace: argument values
+    """
     global api_threads, download_threads, crop_threads, mapping_file
 
     parser = argparse.ArgumentParser(
-        description="Downloads and crops all Sentinel 2 images in the given CSV table. \n\n"
+        description="Downloads and crops all Sentinel-2 images in the given CSV table.\n"
+        "It is important to balance the amount of threads for every type to the resources available on the machine.\n\n"
         "Required environment variables: \n"
-        "SENTINEL_DIR: Target directory for the cropped Sentinel 2 files \n"
+        "SENTINEL_DIR: Target directory for the cropped Sentinel-2 files \n"
         "TMP_DIR: Temporary working directory (ramdisk recommended) \n"
         "COPERNICUS_USER: Copernicus API user \n"
         "COPERNICUS_PASSWORD: Copernicus API password \n"
@@ -78,21 +89,21 @@ def setup_parser() -> argparse.Namespace:
     parser.add_argument(
         "--api-threads",
         "-a",
-        help="Number of Copernicus API threads",
+        help="Number of Copernicus API threads (balance of network and CPU)",
         nargs="?",
         default="4",
     )
     parser.add_argument(
         "--download-threads",
         "-d",
-        help="Number of download threads",
+        help="Number of download threads (network heavy)",
         nargs="?",
         default="4",
     )
     parser.add_argument(
         "--worker-threads",
         "-w",
-        help="Number of CPU worker threads",
+        help="Number of CPU worker threads (CPU heavy)",
         nargs="?",
         default="4",
     )
@@ -106,7 +117,12 @@ def setup_parser() -> argparse.Namespace:
         "--input", "-i", help="Path to input LUCAS SOIL CSV file", required=True
     )
     parser.add_argument(
-        "--mapping", "-m", help="Path to save the mapping CSV", nargs="?", default=""
+        "--mapping",
+        "-m",
+        help="Path to save the mapping CSV\n"
+        "Needed to map soil data points to downloaded Sentinel-2 datasets later",
+        nargs="?",
+        default="",
     )
     args = parser.parse_args()
 
@@ -120,7 +136,15 @@ def setup_parser() -> argparse.Namespace:
 
 
 def api_thread(thread_index: int) -> None:
+    """
+    Thread for the API workers, needs a balance of network bandwith and CPU power.
+    Queries datasets from the Copernicus API and filters clouded images.
+
+    Args:
+        thread_index (int): Index of the thread (for log output)
+    """
     global dataframe, data_length, api_counter, errors, download_threads, download_jobs
+    # prefix every output to identify the thread
     sys.stdout.add_prefix(f"[API Thread {thread_index+1}]")
     sys.stderr.add_prefix(f"[API Thread {thread_index+1}]")
 
@@ -177,7 +201,15 @@ def api_thread(thread_index: int) -> None:
 
 
 def download_thread(thread_index: int) -> None:
+    """
+    Thread for the Download workers, needs network bandwith.
+    Downloads and extracts full datasets from the Copernicus API.
+
+    Args:
+        thread_index (int): Index of the thread (for log output)
+    """
     global data_length, errors, crop_threads, download_jobs, crop_jobs, api_finished
+    # prefix every output to identify the thread
     sys.stdout.add_prefix(f"[DL Thread {thread_index+1}]")
     sys.stderr.add_prefix(f"[DL Thread {thread_index+1}]")
 
@@ -211,7 +243,15 @@ def download_thread(thread_index: int) -> None:
 
 
 def crop_thread(thread_index: int) -> None:
+    """
+    Thread for the Image-Cropping workers, needs heavy CPU power.
+    Crops downloaded images around the area of interest.
+
+    Args:
+        thread_index (int): Index of the thread (for log output)
+    """
     global data_length, errors, crop_jobs, download_finished
+    # prefix every output to identify the thread
     sys.stdout.add_prefix(f"[Crop Thread {thread_index+1}]")
     sys.stderr.add_prefix(f"[Crop Thread {thread_index+1}]")
 
@@ -251,13 +291,13 @@ def main():
 
     args = setup_parser()
 
-    if mapping_file:
-        if not os.path.isfile(mapping_file):
-            with open(mapping_file, "w") as file:
-                print(
-                    "POINTID,SURVEY_DATE,TH_LAT,TH_LONG,SENTINEL_DATE,SENTINEL_ID",
-                    file=file,
-                )
+    # create Sentinel mapping file
+    if mapping_file and not os.path.isfile(mapping_file):
+        with open(mapping_file, "w") as file:
+            print(
+                "POINTID,SURVEY_DATE,TH_LAT,TH_LONG,SENTINEL_DATE,SENTINEL_ID",
+                file=file,
+            )
 
     data = pd.read_csv(args.input, sep=",", header=0)
 
@@ -266,46 +306,46 @@ def main():
 
     start = int(args.start) - 1
     end = int(args.end)
-
     if end > 0:
         dataframe = data.iloc[start:end]
     else:
         dataframe = data.iloc[start:]
-
     data_length = len(dataframe)
 
     print(f"Loaded {data_length} rows (lines {start+1}-{end or "∞"}).")
 
+    # create all threads
     threads_api = []
+    threads_download = []
+    threads_crop = []
     for i in range(api_threads):
         threads_api.append(threading.Thread(target=api_thread, args=(i,)))
-
-    threads_download = []
     for i in range(download_threads):
         threads_download.append(threading.Thread(target=download_thread, args=(i,)))
-
-    threads_crop = []
     for i in range(crop_threads):
         threads_crop.append(threading.Thread(target=crop_thread, args=(i,)))
 
-    sys.stdout = ThreadPrefixStd(sys.__stdout__)
-    sys.stderr = ThreadPrefixStd(sys.__stderr__)
+    sys.stdout = ThreadPrefix(sys.__stdout__)
+    sys.stderr = ThreadPrefix(sys.__stderr__)
 
+    # start all threads
     for thread in threads_api + threads_download + threads_crop:
         thread.start()
 
+    # wait for all API threads to finish
     for thread in threads_api:
         thread.join()
     api_finished = True
 
+    # wait for all Download threads to finish
     for thread in threads_download:
         thread.join()
     download_finished = True
 
+    # wait for the last crop threads and display results
     for thread in threads_crop:
         thread.join()
-
-    print(f"--- Finished downloading {data_length} Sentinel 2 datasets.")
+    print(f"--- Finished downloading {data_length} Sentinel-2 datasets.")
     print(f"Failed: {errors}")
 
 

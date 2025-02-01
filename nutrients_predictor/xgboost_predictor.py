@@ -1,6 +1,5 @@
 import numpy as np
 import optuna
-import plotly.graph_objects as go
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error
 
@@ -19,15 +18,16 @@ def objective(trial, dtrain, dtest, Y_test, path_savemodel):
         # Hyperparameters to tune:
         "max_depth": trial.suggest_int("max_depth", 3, 12),
         "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3),
-        "subsample": trial.suggest_float(
-            "subsample", 0.6, 1.0
-        ),  # Column sampling per tree
-        "colsample_bytree": trial.suggest_float(
-            "colsample_bytree", 0.6, 1.0
-        ),  # Column sampling per tree
-        "gamma": trial.suggest_float("gamma", 0, 1),  # Regularization parameter
-        "reg_alpha": trial.suggest_float("reg_alpha", 0, 1),  # L1 regularization
-        "reg_lambda": trial.suggest_float("reg_lambda", 0, 1),  # L2 regularization
+        # Column sampling per tree
+        "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+        # Column sampling per tree
+        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
+        # Regularization parameter
+        "gamma": trial.suggest_float("gamma", 0, 1),
+        # L1 regularization
+        "reg_alpha": trial.suggest_float("reg_alpha", 0, 1),
+        # L2 regularization
+        "reg_lambda": trial.suggest_float("reg_lambda", 0, 1),
     }
 
     model = xgb.train(param, dtrain)
@@ -44,7 +44,7 @@ def objective(trial, dtrain, dtest, Y_test, path_savemodel):
     return rmse
 
 
-def run_xgboost_train(X_train, X_test, Y_train, Y_test, path_savemodel):
+def run_xgboost_train(X_train, X_test, Y_train, Y_test, model_path):
     """
     This function initiates the XGBoost training and hyperparameter optimization process:
     - Converts the training and testing datasets into DMatrix format for XGBoost.
@@ -55,26 +55,13 @@ def run_xgboost_train(X_train, X_test, Y_train, Y_test, path_savemodel):
 
     study = optuna.create_study(direction="minimize")  # Minimize RMSE
     study.optimize(
-        lambda trial: objective(trial, dtrain, dtest, Y_test, path_savemodel),
+        lambda trial: objective(trial, dtrain, dtest, Y_test, model_path),
         n_trials=50,
     )
 
-    plot_data = optuna.visualization.plot_param_importances(
-        study, evaluator=None, params=None, target=None, target_name="Objective Value"
-    )
-    fig = go.Figure(plot_data)
-    fig.update_layout(
-        title="XGBoost Parameter Sensitivity",
-        xaxis_title="Relative Sensitivity",
-        yaxis_title="Parameter",
-        font=dict(size=18),
-    )
-    fig.show()
-
     print("Best hyperparameters of the trial", study.best_params)
     print(
-        "RMSE error of the model with the best hyperparameters:",
-        np.sqrt(study.best_value),
+        f"RMSE error of the model with the best hyperparameters: {np.sqrt(study.best_value)}"
     )
 
 
@@ -99,15 +86,16 @@ def objective_with_scv(trial, folds, path_savemodel):
         # Hyperparameters to tune:
         "max_depth": trial.suggest_int("max_depth", 3, 12),
         "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3),
-        "subsample": trial.suggest_float(
-            "subsample", 0.6, 1.0
-        ),  # Column sampling per tree
-        "colsample_bytree": trial.suggest_float(
-            "colsample_bytree", 0.6, 1.0
-        ),  # Column sampling per tree
-        "gamma": trial.suggest_float("gamma", 0, 1),  # Regularization parameter
-        "reg_alpha": trial.suggest_float("reg_alpha", 0, 1),  # L1 regularization
-        "reg_lambda": trial.suggest_float("reg_lambda", 0, 1),  # L2 regularization
+        # Column sampling per tree
+        "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+        # Column sampling per tree
+        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
+        # Regularization parameter
+        "gamma": trial.suggest_float("gamma", 0, 1),
+        # L1 regularization
+        "reg_alpha": trial.suggest_float("reg_alpha", 0, 1),
+        # L2 regularization
+        "reg_lambda": trial.suggest_float("reg_lambda", 0, 1),
     }
 
     fold_rmses = []

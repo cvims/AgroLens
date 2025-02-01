@@ -1,14 +1,11 @@
 #!/usr/bin/env python
+# Script to plot the raw pixel data for visualization and interpretation
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-"""
-plot the raw pixel data for virualization and interpretation
-"""
-
 filepath = "../Model_A+_Soil+Sentinel_9x9.csv"
-
 
 data_header = pd.read_csv(filepath, sep=",", nrows=0)
 print(data_header.shape)
@@ -19,7 +16,6 @@ print(idx_start, idx_end)
 data_bands = pd.read_csv(
     filepath, sep=",", usecols=range(idx_start, idx_end + 1), header=0
 )
-# print(data_long.head, data_bands.head)
 print(data_bands.shape)
 
 

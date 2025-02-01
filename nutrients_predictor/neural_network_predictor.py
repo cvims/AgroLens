@@ -1,5 +1,4 @@
 import optuna
-import plotly.graph_objects as go
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -34,15 +33,15 @@ class RegressionNet(nn.Module):
 
         Args:
             input_size (int): Number of input features. Default is 12.
-            hidden_sizes (list): Sizes of the hidden layers. Default is [64, 32, 16].
+            hidden_sizes (list[int]): Sizes of the hidden layers. Default is [64, 32, 16].
             output_size (int): Number of output features. Default is 1 (regression output).
-            dropout_rate (float): Dropout rate applied after each hidden layer. Default is [0.3, 0.3, 0.3].
+            dropout_rate (list[float]): Dropout rate applied after each hidden layer. Default is [0.3, 0.3, 0.3].
         """
         super(RegressionNet, self).__init__()
         layers = []
         in_features = input_size
 
-        for i, (hidden_size, dropout_rate) in enumerate(
+        for _, (hidden_size, dropout_rate) in enumerate(
             zip(hidden_sizes, dropout_rates)
         ):
             layers.append(nn.Linear(in_features, hidden_size))
@@ -50,7 +49,7 @@ class RegressionNet(nn.Module):
             layers.append(nn.Dropout(dropout_rate))
             in_features = hidden_size
 
-        layers.append(nn.Linear(in_features, output_size))  # Ausgabeschicht
+        layers.append(nn.Linear(in_features, output_size))  # output layer
         self.model = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -96,6 +95,7 @@ class TrainingPipeline:
         Args:
             train_loader (DataLoader): DataLoader for the training dataset.
             test_loader (DataLoader): DataLoader for the testing/validation dataset.
+            model (nn.Module): The neural network model for regression.
             learning_rate (float): Learning rate for the optimizer. Default is 0.001.
             optimizer_type (str): Type of optimizer to use ('SGD' or 'Adam'). Default is 'Adam'.
             criterion (nn.Module, optional): Loss function. Default is nn.MSELoss().
@@ -112,7 +112,7 @@ class TrainingPipeline:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = model.to(self.device)
 
-    def _get_optimizer(self):
+    def _get_optimizer(self) -> optim.SGD | optim.Adam:
         if self.optimizer_type == "SGD":
             return optim.SGD(
                 self.model.parameters(), lr=self.learning_rate, weight_decay=0.01
@@ -241,7 +241,7 @@ class TrainingPipeline:
         return model
 
 
-def objective(input_size, trial, train_loader, test_loader, path_savemodel):
+def objective(input_size, trial, train_loader, test_loader, model_savepath) -> float:
     """
     Defines the objective function for hyperparameter optimization using Optuna.
 
@@ -250,6 +250,7 @@ def objective(input_size, trial, train_loader, test_loader, path_savemodel):
         trial (optuna.trial): An Optuna trial object that helps in suggesting hyperparameters.
         train_loader (DataLoader): DataLoader for the training dataset.
         test_loader (DataLoader): DataLoader for the testing/validation dataset.
+        model_savepath (str): The path to save the model file.
 
     Returns:
         float: The test loss after training the model, which Optuna will try to minimize.
@@ -292,20 +293,20 @@ def objective(input_size, trial, train_loader, test_loader, path_savemodel):
 
     # Save model with the best performance
     if trial.number == 0 or test_loss < trial.study.best_value:
-        pipeline.save_model(path_savemodel)
+        pipeline.save_model(model_savepath)
         print(f"Model with Loss {test_loss} saved.")
 
     return test_loss
 
 
-def run_nn_train(input_size, train_loader, test_loader, path_savemodel):
+def run_nn_train(input_size, train_loader, test_loader, model_savepath):
     """
     Runs the training of a regression neuronal network using Optuna and manages model files.
 
     Args:
         train_loader (DataLoader): DataLoader for the training dataset.
         test_loader (DataLoader): DataLoader for the testing/validation dataset.
-        path_savemodel (str): Path of the saved model file.
+        model_savepath (str): Path of the saved model file.
 
     """
 
@@ -313,23 +314,11 @@ def run_nn_train(input_size, train_loader, test_loader, path_savemodel):
     study = optuna.create_study(direction="minimize")
     study.optimize(
         lambda trial: objective(
-            input_size, trial, train_loader, test_loader, path_savemodel
+            input_size, trial, train_loader, test_loader, model_savepath
         ),
         n_trials=20,
         timeout=600,
     )
-
-    plot_data = optuna.visualization.plot_param_importances(
-        study, evaluator=None, params=None, target=None, target_name="Objective Value"
-    )
-    fig = go.Figure(plot_data)
-    fig.update_layout(
-        title="Fully Connected NN Parameter Sensitivity",
-        xaxis_title="Relative Sensitivity",
-        yaxis_title="Parameter",
-        font=dict(size=18),
-    )
-    fig.show()
 
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])

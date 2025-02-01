@@ -1,6 +1,9 @@
 #!/usr/bin/env python
+# Queries Yield data for a given soil data CSV and generates a combined CSV table
+
 import glob
 import os
+from pathlib import Path
 
 import pandas as pd
 import rasterio
@@ -10,16 +13,19 @@ from pyproj import CRS, Transformer
 # USER-DEFINED PATHS
 # ------------------------------------------------------------------------------
 # 1) The path to your input CSV
-csv_input = "/media/data/Datasets/Model_A.csv"
+csv_input = Path(os.environ["DATASET_PATH"]) / "Model_A.csv"
 
 # 2) Two directories containing T 2010 data for Theme 5 and Theme 6
 #    (Adjust these paths to your actual folder structure)
 t2010_directories = [
-    "/media/data/Datasets/Crop/Theme 5 Actual Yields and Production/T/2010"
+    Path(os.environ["DATASET_PATH"])
+    / "Crop"
+    / "Theme 5 Actual Yields and Production/T/2010"
 ]
 
-# 3) Output Excel file
-csv_output = "/media/data/Datasets/Model_A+_yield.csv"
+# 3) Output CSV file
+csv_output = Path(os.environ["DATASET_PATH"]) / "Model_A+_yield.csv"
+
 
 
 # ------------------------------------------------------------------------------
@@ -64,7 +70,7 @@ def main():
     tif_files = []
     for directory in t2010_directories:
         # Recursively search for all *yld.tif
-        tif_files.extend(glob.glob(os.path.join(directory, "*yld.tif")))
+        tif_files.extend(glob.glob(directory.joinpath("*yld.tif")))
 
     # Sort the list
     tif_files = sorted(tif_files)
@@ -74,8 +80,7 @@ def main():
     for tif_path in tif_files:
         # Generate a short column name from the file
         # e.g., "brl_2010_yld" from "brl_2010_yld.tif"
-        base_name = os.path.splitext(os.path.basename(tif_path))[0]
-        col_name = f"{base_name}_val"  # e.g. "brl_2010_yld_val"
+        col_name = f"{tif_path.stem}_val"  # e.g. "brl_2010_yld_val"
 
         print(f"Sampling from: {tif_path} -> {col_name}")
 

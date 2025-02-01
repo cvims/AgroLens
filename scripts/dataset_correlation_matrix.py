@@ -1,20 +1,5 @@
 #!/usr/bin/env python
-"""
-Script Name: Dataset_Correlation_Matrix
-Author: Marinus Luegmair
-Date: 17.01.25
-Description: Short programm to read a data table, calculate the correlation matrix and plot it
-
-This script performs the following tasks:
-- read a .csv with the data
-- choose all data, only data where the name contains a substring or not contains a substring
-- calculate the correlation coefficent matrix for all choosen data
-- plot the matrix
-- save the matrix (optional)
-  
-
-"""
-
+# Script to read a data table, calculate the correlation matrix and plot it
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -26,17 +11,20 @@ def compute_and_plot_correlation(csv_file, substring="", exclude=False):
     # Read the CSV file using pandas
     data = pd.read_csv(csv_file)
 
+    # choose only data where the name contains a substring or not contains a substring,
+    # depending on the parameter 'exclude'
     if exclude == False:
         filtered_columns = [col for col in data.columns if substring in col]
         filtered_data = data[filtered_columns]
-
     else:
         filtered_columns = [col for col in data.columns if substring not in col]
         filtered_data = data[filtered_columns]
 
+    # calculate the correlation coefficent matrix for all choosen data
     numeric_data = filtered_data.select_dtypes(include=[np.number])
     corr_matrix = np.corrcoef(numeric_data.T)
 
+    # plot the matrix
     plt.ion()
     plt.figure(figsize=(10, 8))
     sns.heatmap(
