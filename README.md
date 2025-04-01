@@ -5,6 +5,8 @@ This project was developed in collaboration with **Professor Dr. Torsten Schön*
 
 More details: [MI4People - Soil Quality Evaluation System](https://www.mi4people.org/soil-quality-evaluation-system)
 
+[Paper](https://arxiv.org/abs/2503.22276)
+[Dataset](https://zenodo.org/records/15100427)
 
 ## Purpose
 Efficient nutrient management and precise fertilization are essential for advancing modern agriculture, particularly in regions striving to optimize crop yields sustainably. The AgroLens project endeavors to address this challenge by developing Machine Learning (ML)-based methodologies to predict soil nutrient levels without reliance on laboratory tests. By leveraging state of the art techniques, the project lays a foundation for actionable insights to improve agricultural productivity in resource-constrained areas, such as Africa.
